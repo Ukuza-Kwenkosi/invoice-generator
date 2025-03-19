@@ -3,13 +3,16 @@
   "version": "1.0.0",
   "main": "local-server.js",
   "scripts": {
-    "start": "node local-server.js"
+    "start": "node local-server.js",
+    "build": "node deploy/build.js",
+    "deploy": "node deploy/deploy.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "Simple client-side invoice generator",
   "dependencies": {
+    "aws-sdk": "^2.1692.0",
     "ejs": "^3.1.10",
     "express": "^4.21.2"
   }
