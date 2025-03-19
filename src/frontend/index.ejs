@@ -142,13 +142,32 @@
         let itemCount = 1;
         let companyLogo = new Image();
         let logoLoaded = false;
+        
+        // Global variables to store logo colors - using brand colors common in South African businesses
+        // This will be much more accurate than the extraction
+        let logoPrimaryColor = [255, 99, 71]; // Darker red for table header
+        let logoSecondaryColor = [245, 245, 245]; // Very light gray for alternating rows
+        let footerColor = [211, 211, 211]; // Light grey for footer
+        
+        // Preload company logo for PDF - improved handling
+        function preloadLogo() {
+            const logoImg = document.getElementById('companyLogo');
+            companyLogo = new Image();
+            companyLogo.crossOrigin = "Anonymous"; // Handle cross-origin images if needed
+            companyLogo.src = logoImg.src;
+            companyLogo.onload = function() {
+                console.log("Logo loaded successfully");
+                logoLoaded = true;
+                // No longer attempting to extract colors as it's not accurate
+            };
+            companyLogo.onerror = function() {
+                console.error("Error loading logo");
+                logoLoaded = false;
+            };
+        }
 
-        // Preload company logo for PDF
-        const logoImg = document.getElementById('companyLogo');
-        companyLogo.src = logoImg.src;
-        companyLogo.onload = function() {
-            logoLoaded = true;
-        };
+        // Call the preload function when the page loads
+        window.addEventListener('load', preloadLogo);
 
         // Helper function for API calls
         function makeApiCall(url, method = 'GET', body = null) {
@@ -291,31 +310,46 @@
         function generatePDF(customer, items) {
             // Create new jsPDF instance
             const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
+            const doc = new jsPDF({
+                margins: { top: 25, bottom: 25, left: 25, right: 25 }
+            });
             
-            // Add company logo
+            // Define margin spaces
+            const leftMargin = 25;  // Increased left margin
+            const topMargin = 25;   // Increased top margin
+            const rightMargin = 185; // Reduced from 195 to create more right margin
+            
+            // Add company logo - improve size and positioning with increased margins
             if (logoLoaded) {
-                doc.addImage(companyLogo, 'PNG', 20, 10, 40, 30);
+                // Calculate logo dimensions to maintain aspect ratio
+                const logoWidth = 72; // Increased by 30% from 55
+                const logoAspectRatio = companyLogo.height / companyLogo.width;
+                const logoHeight = logoWidth * logoAspectRatio;
+                
+                // Position logo with increased top and left margins
+                doc.addImage(companyLogo, 'PNG', leftMargin - 10, topMargin, logoWidth, Math.min(logoHeight, 52)); // Height cap increased proportionally
             }
             
-            // Add quote title and number
-            const quoteNo = Math.floor(Math.random() * 1000).toString();
-            doc.setFontSize(22);
-            doc.text('QUOTE', 150, 20);
-            doc.setFontSize(10);
-            doc.text(`Quote #: ${quoteNo}`, 150, 30);
-            doc.text(`Date: ${new Date().toLocaleDateString()}`, 150, 40);
+            // Add company information - right-aligned with increased top margin
+            doc.setFontSize(8);
+            doc.setFont(undefined, 'normal');
+            doc.text('Ukuza Kwenkosi Enterprises trading as Ukuza Kivenkosi Enterprises', rightMargin, topMargin + 15, { align: 'right' });
+            doc.text('Reg No 2012/750142/07 TAX No. 9278518254', rightMargin, topMargin + 20, { align: 'right' });
+            doc.text('E2144 Osizeni, Newcastle, KiaZulu-Natal, 2952', rightMargin, topMargin + 25, { align: 'right' });
             
-            // Add customer information
-            doc.setFontSize(12);
-            doc.text('Customer Information:', 20, 60);
+           
+            // Add customer information - adjusted for new margins
+            let customerInfoTopMargin = 55;
             doc.setFontSize(10);
-            doc.text(`Name: ${customer.name}`, 20, 70);
-            doc.text(`Address: ${customer.address}`, 20, 80);
-            doc.text(`Email: ${customer.email}`, 20, 90);
-            doc.text(`Phone: ${customer.phone}`, 20, 100);
+            const quoteNo = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+            doc.text(`Quote #: ${quoteNo}`, rightMargin, topMargin + customerInfoTopMargin, { align: 'right' });
+            doc.text(`Date: ${new Date().toLocaleDateString()}`, rightMargin, topMargin + customerInfoTopMargin + 5, { align: 'right' });
+            doc.text(`Name: ${customer.name}`, leftMargin, topMargin + customerInfoTopMargin);
+            doc.text(`Address: ${customer.address}`, leftMargin, topMargin + customerInfoTopMargin + 5);
+            doc.text(`Email: ${customer.email}`, leftMargin, topMargin + customerInfoTopMargin + 10);
+            doc.text(`Phone: ${customer.phone}`, leftMargin, topMargin + customerInfoTopMargin + 15);
             
-            // Add items table
+            // Add items table - adjusted for new margins
             const tableColumn = ["Description", "Price", "Quantity", "Total (incl. VAT)"];
             const tableRows = [];
             
@@ -334,32 +368,46 @@
                 ]);
             });
             
-            // Generate the table
+            // Generate the table - adjusted for new margins
             doc.autoTable({
                 head: [tableColumn],
                 body: tableRows,
-                startY: 120,
+                startY: topMargin + 80,
+                margin: { left: leftMargin, right: leftMargin },
                 theme: 'grid',
                 headStyles: {
-                    fillColor: [40, 167, 69],
+                    fillColor: logoPrimaryColor, // Use darker red for header
                     textColor: 255
+                },
+                alternateRowStyles: {
+                    fillColor: logoSecondaryColor // Use extracted secondary color from logo
                 },
                 foot: [['', '', 'Total:', formatCurrency(totalAmount)]],
                 footStyles: {
-                    fillColor: [240, 240, 240],
-                    textColor: [0, 0, 0],
+                    fillColor: footerColor, // Use light grey for footer
+                    textColor: [0, 0, 0], // Set footer font color to black
                     fontStyle: 'bold'
                 }
             });
             
-            // Add terms and conditions
-            const finalY = doc.lastAutoTable.finalY || 120;
+            // Get final position after table
+            const finalY = doc.lastAutoTable.finalY || (topMargin + 115);
+            
+            // Add banking details before terms and conditions
+            doc.text('Capitec Business', leftMargin, finalY + 37);
+            doc.text('Account No: 1052338658', leftMargin, finalY + 44);
+            doc.text('Branch Code: 450105', leftMargin, finalY + 51);
+            doc.text('Swift code: CABLZAJJ', leftMargin, finalY + 58);
+            
+            // Add terms and conditions - adjusted to appear after banking details
             doc.setFontSize(10);
-            doc.text('Terms & Conditions:', 20, finalY + 20);
+            doc.setFont(undefined, 'bold');
+            doc.text('Terms & Conditions:', leftMargin, finalY + 75);
+            doc.setFont(undefined, 'normal');
             doc.setFontSize(8);
-            doc.text('1. This quote is valid for 30 days from the date of issue.', 20, finalY + 30);
-            doc.text('2. Payment terms: 50% deposit required to confirm order.', 20, finalY + 37);
-            doc.text('3. Delivery time: 2-3 weeks after confirmation of order.', 20, finalY + 44);
+            doc.text('1. This quote is valid for 30 days from the date of issue.', leftMargin, finalY + 85);
+            doc.text('2. Payment terms: 50% deposit required to confirm order.', leftMargin, finalY + 92);
+            doc.text('3. Delivery time: 2-3 weeks after confirmation of order.', leftMargin, finalY + 99);
             
             // Return the PDF as blob
             return doc.output('blob');
@@ -412,6 +460,15 @@
             }
 
             try {
+                // Check if logo is loaded before generating PDF
+                if (!logoLoaded) {
+                    console.warn("Logo not loaded yet, attempting to reload...");
+                    // Try to reload the logo
+                    preloadLogo();
+                    // Wait a moment for logo to load
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                
                 // Generate PDF on the client side
                 const pdfBlob = generatePDF(customer, items);
                 const pdfUrl = URL.createObjectURL(pdfBlob);
