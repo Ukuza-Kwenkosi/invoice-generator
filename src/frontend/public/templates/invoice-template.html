@@ -1,0 +1,117 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 10px;
+            font-size: 12px; /* Base font size */
+        }
+        h1 {
+            font-size: 18px; /* Adjust heading sizes */
+        }
+        h2 {
+            font-size: 16px;
+        }
+        h3 {
+            font-size: 14px;
+        }
+        p {
+            font-size: 12px; /* Adjust paragraph text size */
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse; /* Ensures borders are merged */
+            margin-bottom: 10px; /* Reduce table margin */
+            font-size: 10px; /* Adjust table font size */
+            border: 1px solid #000; /* Add border to the table */
+        }
+        th, td {
+            padding: 5px; /* Reduce table cell padding */
+            text-align: left;
+            border: 1px solid #000; /* Add border to table cells */
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+            margin-bottom: 10px; /* Reduce header margin */
+        }
+        .logo {
+            max-width: 150px;
+            height: auto;
+        }
+        .business-details {
+            text-align: right;
+        }
+        .quote-details {
+            margin-bottom: 10px; /* Reduce quote details margin */
+        }
+        .footer {
+            margin-top: 10px; /* Reduce footer margin */
+            padding-top: 5px; /* Reduce footer padding */
+            border-top: 2px solid #000;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Section -->
+    <div class="header">
+        <div class="logo">
+            <img src="[LOGO_PATH]" alt="Company Logo" style="height: 150px;">
+        </div>
+        <div class="business-details">
+            <h2>Ukuza Kwenkosi Enterprises</h2>
+            <p>Address: E2144 Osizweni, Newcastle, KwaZulu-Natal, 2952</p>
+            <p>Reg No: 2012/750142/07 TAX No. 9278518254</p>
+        </div>
+    </div>
+
+    <!-- Quote Details -->
+    <div class="quote-details">
+        <h1>QUOTE</h1>
+        <p><strong>To:</strong> [Client_Name]</p>
+        <p><strong>Date:</strong> [Quote_Date]</p>
+        <p><strong>Quote Number:</strong> [Quote_Number]</p>
+        <p><strong>Contact Number:</strong> [Quote_Phone]</p>
+        <p><strong>Email:</strong> [Quote_Email]</p>
+
+    </div>
+
+    <!-- Itemized Table -->
+    <table>
+        <thead>
+            <tr>
+                <th>Description</th>
+                <th>Unit Price</th>
+                <th>Quantity</th>
+                <th>Price(inc. VAT)</th>
+            </tr>
+        </thead>
+        <tbody>
+            [Itemized_Table]
+            <tr>
+                <td colspan="3" style="text-align: right;border: 0;border-left-style: hidden;border-bottom-style: hidden;"><strong>Total</strong></td>
+                <td style="border-width: medium;"><strong>[Total_Price]</strong></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Footer Section -->
+    <div class="footer">
+        <h3>Banking Details</h3>
+        <p><strong>Bank Name: </strong>Capitec Business</p>
+        <p><strong>Account Name: </strong>Ukuza Kwenkosi Enterprises</p>
+        <p><strong>Account Number: </strong>1052338658</p>
+        <p><strong>Branch Code: </strong>450105</p>
+        <p><strong>Reference: </strong>CABLZAJJ</p>
+        <p>Payment by EFT only. Thank you for your business!</p>
+    </div>
+
+</body>
+</html> 

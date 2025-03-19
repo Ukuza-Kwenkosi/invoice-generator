@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>Quote Generator</title>
+    <!-- Add jsPDF library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        form {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+        select {
+            width: 80%;
+            padding: 8px;
+            margin-top: 5px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        input {
+            width: 80%;
+            padding: 8px;
+            margin-top: 5px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .item {
+            width: 80%;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            display: inline-grid;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #28a745;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        .overlay-text {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #28a745;
+        }
+    </style>
+</head>
+<body>
+    <img 
+        id="companyLogo" 
+        alt="Company Logo" 
+        style="height: 150px;" 
+        src="<%= 
+            (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'production') 
+            ? 'https://d12a5nhj8ffxc6.cloudfront.net/images/company_logo.png' 
+            : '/images/company_logo.png' 
+        %>"
+    >
+    <h1>Quote Generator</h1>
+    <form id="invoiceForm">
+        <label for="customerName">Customer Name:</label>
+        <input type="text" id="customerName" name="customerName" required>
+
+        <label for="address">Address:</label>
+        <input type="text" id="address" name="address" required>
+
+        <label for="emailAddress">Email Address:</label>
+        <input type="email" id="emailAddress" name="emailAddress" required>
+
+        <label for="phone">Phone:</label>
+        <input type="text" id="phone" name="phone" required>
+
+        <h3>Items:</h3>
+        <div id="items">
+            <div class="item">
+                <label for="item0">Select an item:</label>
+                <select id="item0" name="items[0][description]" class="item-dropdown"></select></br>
+                <input type="number" name="items[0][quantity]" placeholder="Quantity" style="display: none;"></br>
+                <label id="price0" style="display: none;">Price: R0.00</label>
+            </div>
+        </div>
+
+        <button type="button" id="addItemBtn" onclick="addItem()" disabled>Add Item</button>
+        <button type="submit" id="generateInvoiceBtn" disabled>Generate Invoice</button>
+    </form>
+
+    <script>
+        let dropdown;
+        let itemCount = 1;
+        let companyLogo = new Image();
+        let logoLoaded = false;
+
+        // Preload company logo for PDF
+        const logoImg = document.getElementById('companyLogo');
+        companyLogo.src = logoImg.src;
+        companyLogo.onload = function() {
+            logoLoaded = true;
+        };
+
+        // Helper function for API calls
+        function makeApiCall(url, method = 'GET', body = null) {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open(method, url, true);
+                
+                // Set headers
+                if (body) {
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                }
+                
+                xhr.onload = function() {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        try {
+                            const response = {
+                                ok: true,
+                                status: xhr.status,
+                                json: () => JSON.parse(xhr.responseText),
+                                text: () => xhr.responseText
+                            };
+                            resolve(response);
+                        } catch (e) {
+                            reject(new Error('Failed to parse response'));
+                        }
+                    } else {
+                        reject(new Error(`HTTP error! status: ${xhr.status}`));
+                    }
+                };
+                
+                xhr.onerror = function() {
+                    reject(new Error('Network error occurred. Please check your connection and try again.'));
+                };
+                
+                try {
+                    xhr.send(body ? JSON.stringify(body) : null);
+                } catch (e) {
+                    reject(new Error('Failed to send request'));
+                }
+            });
+        }
+
+        // Function to check if any item is selected and has quantity
+        function checkItemSelection() {
+            const dropdowns = document.querySelectorAll('.item-dropdown');
+            const hasValidItem = Array.from(dropdowns).some(dropdown => {
+                const itemContainer = dropdown.closest('.item');
+                const quantityInput = itemContainer.querySelector('input[type="number"]');
+                return dropdown.value && dropdown.value !== '' && 
+                       quantityInput.value && parseFloat(quantityInput.value) > 0;
+            });
+            
+            document.getElementById('addItemBtn').disabled = !hasValidItem;
+            document.getElementById('generateInvoiceBtn').disabled = !hasValidItem;
+        }
+
+        // Load dropdown data from JSON
+        function loadDropDown() {
+            // Get data URL based on environment (local vs production)
+            const dataUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                ? '/data.json' 
+                : 'https://invoice-generator-frontend.s3.af-south-1.amazonaws.com/public/data.json';
+            
+            makeApiCall(dataUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (!Array.isArray(data)) {
+                        throw new Error('Invalid data format');
+                    }
+                    
+                    dropdown = document.getElementById('item0');
+                    // Add default option
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = '';
+                    defaultOption.textContent = 'Select board';
+                    defaultOption.disabled = true;
+                    defaultOption.selected = true;
+                    dropdown.appendChild(defaultOption);
+                    
+                    // Add other options
+                    data.forEach(item => {
+                        const option = document.createElement('option');
+                        option.value = item.name;
+                        option.textContent = item.name;
+                        option.dataset.price = item.price;
+                        dropdown.appendChild(option);
+                    });
+
+                    // Initial check for item selection
+                    checkItemSelection();
+                })
+                .catch(error => {
+                    console.error('Error loading items data:', error);
+                    const dropdown = document.getElementById('item0');
+                    dropdown.innerHTML = '<option value="" disabled selected>Error loading items</option>';
+                    alert('Error loading items. Please refresh the page or try again later.');
+                });
+        }
+
+        // Add a new item row
+        function addItem() {
+            const itemsDiv = document.getElementById('items');
+            const newItem = document.createElement('div');
+            newItem.classList.add('item');
+
+            const newDropdown = dropdown.cloneNode(true);
+            newDropdown.id = `item${itemCount}`;
+            newDropdown.name = `items[${itemCount}][description]`;
+
+            newItem.innerHTML = `
+                <label for="${newDropdown.id}">Select an item:</label>
+                ${newDropdown.outerHTML}
+                <input type="number" name="items[${itemCount}][quantity]" placeholder="Quantity" style="display: none;">
+                <label id="price${itemCount}" style="display: none;">Price: R0.00</label>
+            `;
+
+            itemsDiv.appendChild(newItem);
+            itemCount++;
+        }
+
+        // Customer class
+        class Customer {
+            constructor(name, address, email, phone) {
+                this.name = name;
+                this.address = address;
+                this.email = email;
+                this.phone = phone;
+            }
+        }
+
+        // Format currency for PDF
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-ZA', {
+                style: 'currency',
+                currency: 'ZAR'
+            }).format(amount);
+        }
+
+        // Generate PDF using jsPDF
+        function generatePDF(customer, items) {
+            // Create new jsPDF instance
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Add company logo
+            if (logoLoaded) {
+                doc.addImage(companyLogo, 'PNG', 20, 10, 40, 30);
+            }
+            
+            // Add quote title and number
+            const quoteNo = Math.floor(Math.random() * 1000).toString();
+            doc.setFontSize(22);
+            doc.text('QUOTE', 150, 20);
+            doc.setFontSize(10);
+            doc.text(`Quote #: ${quoteNo}`, 150, 30);
+            doc.text(`Date: ${new Date().toLocaleDateString()}`, 150, 40);
+            
+            // Add customer information
+            doc.setFontSize(12);
+            doc.text('Customer Information:', 20, 60);
+            doc.setFontSize(10);
+            doc.text(`Name: ${customer.name}`, 20, 70);
+            doc.text(`Address: ${customer.address}`, 20, 80);
+            doc.text(`Email: ${customer.email}`, 20, 90);
+            doc.text(`Phone: ${customer.phone}`, 20, 100);
+            
+            // Add items table
+            const tableColumn = ["Description", "Price", "Quantity", "Total (incl. VAT)"];
+            const tableRows = [];
+            
+            let totalAmount = 0;
+            
+            // Add item rows to table
+            items.forEach(item => {
+                const total = item.price * item.quantity * 1.15; // Add 15% VAT
+                totalAmount += total;
+                
+                tableRows.push([
+                    item.description,
+                    formatCurrency(item.price),
+                    item.quantity,
+                    formatCurrency(total)
+                ]);
+            });
+            
+            // Generate the table
+            doc.autoTable({
+                head: [tableColumn],
+                body: tableRows,
+                startY: 120,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [40, 167, 69],
+                    textColor: 255
+                },
+                foot: [['', '', 'Total:', formatCurrency(totalAmount)]],
+                footStyles: {
+                    fillColor: [240, 240, 240],
+                    textColor: [0, 0, 0],
+                    fontStyle: 'bold'
+                }
+            });
+            
+            // Add terms and conditions
+            const finalY = doc.lastAutoTable.finalY || 120;
+            doc.setFontSize(10);
+            doc.text('Terms & Conditions:', 20, finalY + 20);
+            doc.setFontSize(8);
+            doc.text('1. This quote is valid for 30 days from the date of issue.', 20, finalY + 30);
+            doc.text('2. Payment terms: 50% deposit required to confirm order.', 20, finalY + 37);
+            doc.text('3. Delivery time: 2-3 weeks after confirmation of order.', 20, finalY + 44);
+            
+            // Return the PDF as blob
+            return doc.output('blob');
+        }
+
+        // Handle form submission
+        document.getElementById('invoiceForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            // Create overlay with loader
+            const overlay = document.createElement('div');
+            overlay.className = 'overlay';
+            
+            const loader = document.createElement('div');
+            loader.className = 'loader';
+            
+            const text = document.createElement('div');
+            text.className = 'overlay-text';
+            text.textContent = 'Generating PDF...';
+            
+            overlay.appendChild(loader);
+            overlay.appendChild(text);
+            document.body.appendChild(overlay);
+
+            const formData = new FormData(event.target);
+
+            // Create a Customer object
+            const customer = new Customer(
+                formData.get('customerName'),
+                formData.get('address'),
+                formData.get('emailAddress'),
+                formData.get('phone')
+            );
+
+            // Collect items
+            const items = [];
+            for (let i = 0; i < itemCount; i++) {
+                const description = formData.get(`items[${i}][description]`);
+                const quantity = formData.get(`items[${i}][quantity]`);
+                const priceElement = document.getElementById(`price${i}`);
+                
+                // Only add items that have been selected and have quantity
+                if (description && quantity) {
+                    items.push({
+                        description: description,
+                        quantity: parseFloat(quantity),
+                        price: parseFloat(priceElement.textContent.replace('Price: R', '').replace(',', ''))
+                    });
+                }
+            }
+
+            try {
+                // Generate PDF on the client side
+                const pdfBlob = generatePDF(customer, items);
+                const pdfUrl = URL.createObjectURL(pdfBlob);
+                
+                // Automatically open PDF in new tab
+                window.open(pdfUrl, '_blank');
+                
+                // Remove overlay after opening PDF
+                setTimeout(() => {
+                    overlay.remove();
+                    // Clean up object URL when done
+                    URL.revokeObjectURL(pdfUrl);
+                }, 3000);
+            } catch (error) {
+                overlay.remove();
+                console.error('Error generating PDF:', error);
+                alert('Error generating PDF. Please try again.');
+            }
+        });
+
+        // Add event listener for price updates
+        document.addEventListener('change', function(e) {
+            if (e.target.classList.contains('item-dropdown')) {
+                const itemIndex = e.target.id.replace('item', '');
+                const selectedOption = e.target.options[e.target.selectedIndex];
+                const priceLabel = document.getElementById(`price${itemIndex}`);
+                const quantityInput = e.target.parentElement.querySelector('input[type="number"]');
+                
+                if (selectedOption.value) {
+                    const price = selectedOption.dataset.price;
+                    priceLabel.textContent = `Price: R${price}`;
+                    priceLabel.style.display = 'block';
+                    quantityInput.style.display = 'block';
+                    quantityInput.setAttribute('required', '');
+                } else {
+                    priceLabel.style.display = 'none';
+                    quantityInput.style.display = 'none';
+                    quantityInput.removeAttribute('required');
+                    quantityInput.value = ''; // Clear the value when hiding
+                }
+
+                // Check item selection status
+                checkItemSelection();
+            }
+        });
+
+        // Add event listener for quantity changes
+        document.addEventListener('input', function(e) {
+            if (e.target.type === 'number') {
+                checkItemSelection();
+            }
+        });
+
+        // Load dropdown on page load
+        loadDropDown();
+    </script>
+</body>
+</html>
