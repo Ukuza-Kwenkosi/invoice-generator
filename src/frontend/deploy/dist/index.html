@@ -15,6 +15,7 @@
         }
         h1 {
             color: #333;
+            text-align: center;
         }
         form {
             max-width: 600px;
@@ -113,6 +114,12 @@
         .description-container label {
             font-weight: bold;
             margin-right: 5px;
+        }
+        #companyLogo {
+            display: block;
+            margin: 0 auto 20px;
+            height: 150px;
+            width: auto;
         }
     </style>
 </head>
@@ -454,7 +461,7 @@
             doc.text(`Phone: ${customer.phone}`, leftMargin, topMargin + customerInfoTopMargin + 15);
             
             // Add items table - adjusted for new margins
-            const tableColumn = ["Description", "Price", "Quantity", "Total (incl. VAT)"];
+            const tableColumn = ["Description", "Price", "Quantity", "Total"];
             const tableRows = [];
             
             let totalAmount = 0;
@@ -577,6 +584,8 @@
                 const description = formData.get(`items[${i}][description]`);
                 const quantity = formData.get(`items[${i}][quantity]`);
                 const selectedOption = document.getElementById(`item${i}`).options[document.getElementById(`item${i}`).selectedIndex];
+                const selectedSize = document.getElementById(`size${i}`).value;
+                const selectedOptionValue = document.getElementById(`option${i}`).value;
                 
                 // Only add items that have a valid description and quantity
                 if (description && 
@@ -594,9 +603,12 @@
                     let fullDescription = description;
                     if (size && size !== 'undefined' && size !== 'null') {
                         fullDescription += ` - ${size}`;
-                    }
+                    }                   
                     if (itemDescription && itemDescription !== 'undefined' && itemDescription !== 'null') {
                         fullDescription += ` (${itemDescription})`;
+                    }
+                    if (selectedOptionValue && selectedOptionValue !== 'undefined' && selectedOptionValue !== 'null') {
+                        fullDescription += ` - ${selectedOptionValue}`;
                     }
                     
                     items.push({
