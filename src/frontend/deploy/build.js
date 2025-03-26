@@ -5,8 +5,8 @@ const ejs = require('ejs');
 
 // Define the source and destination directories
 const srcDir = path.join(__dirname, '..'); // Move one level up to src
-const distDir = path.join(srcDir, 'dist');
-const publicDir = path.join(srcDir, 'public'); // Adjusted path to public directory
+const distDir = path.join(__dirname, 'dist'); // Create dist inside deploy folder
+const publicDir = path.join(srcDir, 'public'); // Path to public directory
 
 // Create the dist directory if it doesn't exist
 if (!fs.existsSync(distDir)) {
@@ -73,14 +73,8 @@ function copyFiles(src, dest) {
     }
 }
 
-// Copy contents from the public directory to the dist directory
-const publicDestDir = path.join(distDir, 'public'); // Destination for public folder
+// Copy contents from the public directory to the dist directory root
 if (fs.existsSync(publicDir)) {
-    // Create the public directory in the dist directory
-    if (!fs.existsSync(publicDestDir)) {
-        fs.mkdirSync(publicDestDir, { recursive: true });
-    }
-
     fs.readdir(publicDir, (err, files) => {
         if (err) {
             console.error('Error reading public directory:', err);
@@ -89,10 +83,32 @@ if (fs.existsSync(publicDir)) {
 
         files.forEach(file => {
             const publicFilePath = path.join(publicDir, file);
-            const destFilePath = path.join(publicDestDir, file); // Copy to the new public directory
-            copyFiles(publicFilePath, destFilePath); // Use the copy function
+            const destFilePath = path.join(distDir, file); // Copy directly to dist root
+            copyFiles(publicFilePath, destFilePath);
         });
     });
 } else {
     console.warn(`Public directory ${publicDir} does not exist.`);
+}
+
+// Copy images directory
+const imagesSrcDir = path.join(srcDir, 'images');
+const imagesDestDir = path.join(distDir, 'images');
+if (fs.existsSync(imagesSrcDir)) {
+    if (!fs.existsSync(imagesDestDir)) {
+        fs.mkdirSync(imagesDestDir, { recursive: true });
+    }
+    copyFiles(imagesSrcDir, imagesDestDir);
+} else {
+    console.warn(`Images directory ${imagesSrcDir} does not exist.`);
+}
+
+// Copy data.json
+const dataSrcFile = path.join(srcDir, 'data.json');
+const dataDestFile = path.join(distDir, 'data.json');
+if (fs.existsSync(dataSrcFile)) {
+    fs.copyFileSync(dataSrcFile, dataDestFile);
+    console.log(`Copied data.json to ${dataDestFile}`);
+} else {
+    console.warn(`data.json ${dataSrcFile} does not exist.`);
 }

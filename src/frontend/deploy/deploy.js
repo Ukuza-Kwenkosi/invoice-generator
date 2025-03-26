@@ -8,6 +8,32 @@ const s3 = new AWS.S3();
 
 const bucketName = 'invoice-generator-web-app';
 
+// Function to delete all objects in the bucket
+async function deleteAllObjects() {
+    try {
+        const data = await s3.listObjects({ Bucket: bucketName }).promise();
+        if (data.Contents.length === 0) {
+            console.log('Bucket is already empty');
+            return;
+        }
+
+        const deleteParams = {
+            Bucket: bucketName,
+            Delete: { Objects: [] }
+        };
+
+        data.Contents.forEach(({ Key }) => {
+            deleteParams.Delete.Objects.push({ Key });
+        });
+
+        await s3.deleteObjects(deleteParams).promise();
+        console.log(`Successfully deleted ${data.Contents.length} objects from bucket`);
+    } catch (error) {
+        console.error('Error deleting objects:', error);
+        throw error;
+    }
+}
+
 // Function to create S3 bucket
 async function createBucket() {
     const params = {
@@ -56,20 +82,30 @@ async function uploadFiles(directory) {
         }
 
         const fileContent = fs.readFileSync(filePath);
-        const contentType = file.endsWith('.html') ? 'text/html' : 'application/octet-stream'; // Set content type
+        let contentType = 'application/octet-stream'; // Default content type
+
+        // Set appropriate content type based on file extension
+        if (file.endsWith('.html')) contentType = 'text/html';
+        else if (file.endsWith('.css')) contentType = 'text/css';
+        else if (file.endsWith('.js')) contentType = 'application/javascript';
+        else if (file.endsWith('.json')) contentType = 'application/json';
+        else if (file.endsWith('.png')) contentType = 'image/png';
+        else if (file.endsWith('.jpg') || file.endsWith('.jpeg')) contentType = 'image/jpeg';
+        else if (file.endsWith('.gif')) contentType = 'image/gif';
+        else if (file.endsWith('.svg')) contentType = 'image/svg+xml';
 
         const params = {
             Bucket: bucketName,
-            Key: path.relative(path.join(__dirname, '..', 'dist'), filePath), // Use relative path for the key
+            Key: path.relative(path.join(__dirname, 'dist'), filePath), // Use relative path for the key
             Body: fileContent,
-            ContentType: contentType, // Set the content type
+            ContentType: contentType
         };
 
         try {
-            await s3.upload(params).promise();
-            console.log(`Uploaded ${file} to ${bucketName}`);
+            await s3.putObject(params).promise();
+            console.log(`Uploaded ${params.Key} to S3`);
         } catch (error) {
-            console.error(`Error uploading ${file}:`, error);
+            console.error(`Error uploading ${params.Key}:`, error);
         }
     }
 }
@@ -79,25 +115,45 @@ async function configureStaticWebsite() {
     const params = {
         Bucket: bucketName,
         WebsiteConfiguration: {
-            IndexDocument: { Suffix: 'index.html' },
-            ErrorDocument: { Key: 'index.html' }, // Redirect errors to index.html
-        },
+            IndexDocument: {
+                Suffix: 'index.html'
+            },
+            ErrorDocument: {
+                Key: 'index.html'
+            }
+        }
     };
 
     try {
         await s3.putBucketWebsite(params).promise();
-        console.log(`Bucket ${bucketName} configured for static website hosting.`);
+        console.log('Static website hosting configured successfully');
     } catch (error) {
         console.error('Error configuring static website:', error);
     }
 }
 
-// Main function to deploy to S3
+// Main deployment function
 async function deployToS3() {
-    await createBucket();
-    await uploadFiles(path.join(__dirname, '..', 'dist')); // Adjust the path to your dist directory
-    await configureStaticWebsite();
+    try {
+        // Delete existing objects
+        await deleteAllObjects();
+        
+        // Create bucket if it doesn't exist
+        await createBucket();
+        
+        // Upload files from dist directory
+        const distDir = path.join(__dirname, 'dist');
+        await uploadFiles(distDir);
+        
+        // Configure static website hosting
+        await configureStaticWebsite();
+        
+        console.log('Deployment completed successfully!');
+    } catch (error) {
+        console.error('Deployment failed:', error);
+        process.exit(1);
+    }
 }
 
-// Execute the deployment
+// Run the deployment
 deployToS3();
