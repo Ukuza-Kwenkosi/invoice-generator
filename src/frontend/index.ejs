@@ -47,7 +47,18 @@
             padding: 10px;
             margin-bottom: 10px;
             border-radius: 4px;
-            display: inline-grid;
+            display: grid;
+            gap: 10px;
+        }
+        .item-description {
+            color: #666;
+            margin: 5px 0;
+        }
+        .hidden {
+            display: none;
+        }
+        .size-dropdown, .option-dropdown {
+            transition: all 0.3s ease;
         }
         button {
             padding: 10px 20px;
@@ -96,6 +107,13 @@
             font-size: 18px;
             color: #28a745;
         }
+        .description-container {
+            margin: 5px 0;
+        }
+        .description-container label {
+            font-weight: bold;
+            margin-right: 5px;
+        }
     </style>
 </head>
 <body>
@@ -103,7 +121,7 @@
         id="companyLogo" 
         alt="Company Logo" 
         style="height: 150px;" 
-        src="public/images/company_logo.png"/>
+        src="images/company_logo.png"/>
     <h1>Quote Generator</h1>
     <form id="invoiceForm">
         <label for="customerName">Customer Name:</label>
@@ -122,8 +140,17 @@
         <div id="items">
             <div class="item">
                 <label for="item0">Select an item:</label>
-                <select id="item0" name="items[0][description]" class="item-dropdown"></select></br>
-                <input type="number" name="items[0][quantity]" placeholder="Quantity" style="display: none;"></br>
+                <select id="item0" name="items[0][description]" class="item-dropdown"></select>
+                <div id="description0" class="description-container">
+                    <label>Description:</label>
+                    <span class="item-description"></span>
+                </div>
+                <label for="size0" class="size-label hidden">Size:</label>
+                <select id="size0" name="items[0][size]" class="size-dropdown hidden" disabled></select>
+                <label for="option0" class="option-label hidden">Options:</label>
+                <select id="option0" name="items[0][option]" class="option-dropdown hidden" disabled></select>
+                <input type="number" name="items[0][quantity]" placeholder="Quantity" style="display: none;" inputmode="numeric" pattern="[0-9]*">
+                
                 <label id="price0" style="display: none;">Price: R0.00</label>
             </div>
         </div>
@@ -162,7 +189,21 @@
         }
 
         // Call the preload function when the page loads
-        window.addEventListener('load', preloadLogo);
+        window.addEventListener('DOMContentLoaded', function() {
+            // First, ensure all DOM elements are loaded
+            const dropdown = document.getElementById('item0');
+            const descriptionContainer = document.getElementById('description0');
+            
+            if (!dropdown || !descriptionContainer) {
+                console.error('Required DOM elements not found');
+                return;
+            }
+
+            // Then initialize everything in the correct order
+            preloadLogo();
+            setupEventListeners();
+            loadDropDown();
+        });
 
         // Function to check if any item is selected and has quantity
         function checkItemSelection() {
@@ -170,18 +211,244 @@
             const hasValidItem = Array.from(dropdowns).some(dropdown => {
                 const itemContainer = dropdown.closest('.item');
                 const quantityInput = itemContainer.querySelector('input[type="number"]');
-                return dropdown.value && dropdown.value !== '' && 
-                       quantityInput.value && parseFloat(quantityInput.value) > 0;
+                const selectedOption = dropdown.options[dropdown.selectedIndex];
+                
+                // Check if an item is selected and has a valid quantity
+                return selectedOption && 
+                       selectedOption.value && 
+                       selectedOption.value !== '' && 
+                       quantityInput && 
+                       quantityInput.value && 
+                       parseFloat(quantityInput.value) > 0;
             });
             
+            // Enable/disable buttons based on selection
             document.getElementById('addItemBtn').disabled = !hasValidItem;
             document.getElementById('generateInvoiceBtn').disabled = !hasValidItem;
+            
+            // Log the state for debugging
+            console.log('Has valid item:', hasValidItem);
+            console.log('Add Item button disabled:', document.getElementById('addItemBtn').disabled);
+            console.log('Generate Invoice button disabled:', document.getElementById('generateInvoiceBtn').disabled);
+        }
+
+        // Update event listeners
+        function setupEventListeners() {
+            document.addEventListener('change', function(e) {
+                if (e.target.classList.contains('item-dropdown')) {
+                    const itemIndex = e.target.id.replace('item', '');
+                    const selectedOption = e.target.options[e.target.selectedIndex];
+                    const priceLabel = document.getElementById(`price${itemIndex}`);
+                    const quantityInput = e.target.parentElement.querySelector('input[type="number"]');
+                    const descriptionContainer = document.getElementById(`description${itemIndex}`);
+                    
+                    if (selectedOption.value) {
+                        // Set description first
+                        if (descriptionContainer) {
+                            const descriptionSpan = descriptionContainer.querySelector('.item-description');
+                            if (descriptionSpan) {
+                                descriptionSpan.textContent = selectedOption.dataset.description || '';
+                                descriptionContainer.style.display = 'block';
+                            }
+                        }
+
+                        // Then show price
+                        if (priceLabel) {
+                            const price = selectedOption.dataset.price;
+                            priceLabel.textContent = `Price: R${price}`;
+                            priceLabel.style.display = 'block';
+                        }
+                        
+                        // Show size dropdown and its label
+                        const sizeLabel = document.querySelector(`label[for="size${itemIndex}"]`);
+                        const sizeDropdown = document.getElementById(`size${itemIndex}`);
+                        if (sizeLabel && sizeDropdown) {
+                            sizeLabel.classList.remove('hidden');
+                            sizeDropdown.classList.remove('hidden');
+                            sizeDropdown.disabled = false;
+
+                            // Add size option
+                            sizeDropdown.innerHTML = '';
+                            const sizeOption = document.createElement('option');
+                            sizeOption.value = selectedOption.dataset.size;
+                            sizeOption.textContent = selectedOption.dataset.size;
+                            sizeDropdown.appendChild(sizeOption);
+
+                            // Trigger options dropdown since size is pre-selected
+                            const optionLabel = document.querySelector(`label[for="option${itemIndex}"]`);
+                            const optionDropdown = document.getElementById(`option${itemIndex}`);
+                            const quantityInput = sizeDropdown.parentElement.querySelector('input[type="number"]');
+                            
+                            if (optionLabel && optionDropdown) {
+                                const options = JSON.parse(selectedOption.dataset.options);
+                                if (options && options.length > 0) {
+                                    optionLabel.classList.remove('hidden');
+                                    optionDropdown.classList.remove('hidden');
+                                    optionDropdown.disabled = false;
+
+                                    optionDropdown.innerHTML = '';
+                                    const defaultOption = document.createElement('option');
+                                    defaultOption.value = '';
+                                    defaultOption.textContent = 'Select option';
+                                    defaultOption.disabled = true;
+                                    defaultOption.selected = true;
+                                    optionDropdown.appendChild(defaultOption);
+
+                                    options.forEach(option => {
+                                        const optionElement = document.createElement('option');
+                                        optionElement.value = option;
+                                        optionElement.textContent = option;
+                                        optionDropdown.appendChild(optionElement);
+                                    });
+
+                                    // Hide quantity input when showing options
+                                    if (quantityInput) {
+                                        quantityInput.style.display = 'none';
+                                        quantityInput.removeAttribute('required');
+                                        quantityInput.value = '';
+                                    }
+                                } else {
+                                    optionLabel.classList.add('hidden');
+                                    optionDropdown.classList.add('hidden');
+                                    optionDropdown.disabled = true;
+                                    // Show quantity input if no options
+                                    if (quantityInput) {
+                                        quantityInput.style.display = 'block';
+                                        quantityInput.setAttribute('required', '');
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // Hide all controls when no item is selected
+                        if (priceLabel) {
+                            priceLabel.style.display = 'none';
+                        }
+                        if (quantityInput) {
+                            quantityInput.style.display = 'none';
+                            quantityInput.removeAttribute('required');
+                            quantityInput.value = '';
+                        }
+                        
+                        // Hide all dropdowns and labels
+                        const sizeLabel = document.querySelector(`label[for="size${itemIndex}"]`);
+                        const sizeDropdown = document.getElementById(`size${itemIndex}`);
+                        const optionLabel = document.querySelector(`label[for="option${itemIndex}"]`);
+                        const optionDropdown = document.getElementById(`option${itemIndex}`);
+                        
+                        if (sizeLabel && sizeDropdown) {
+                            sizeLabel.classList.add('hidden');
+                            sizeDropdown.classList.add('hidden');
+                            sizeDropdown.disabled = true;
+                        }
+                        if (optionLabel && optionDropdown) {
+                            optionLabel.classList.add('hidden');
+                            optionDropdown.classList.add('hidden');
+                            optionDropdown.disabled = true;
+                        }
+
+                        // Hide description container when no item is selected
+                        if (descriptionContainer) {
+                            descriptionContainer.style.display = 'none';
+                        }
+                    }
+                    checkItemSelection();
+                } else if (e.target.classList.contains('size-dropdown')) {
+                    const itemIndex = e.target.id.replace('size', '');
+                    const optionLabel = document.querySelector(`label[for="option${itemIndex}"]`);
+                    const optionDropdown = document.getElementById(`option${itemIndex}`);
+                    const quantityInput = e.target.parentElement.querySelector('input[type="number"]');
+                    
+                    console.log('Size dropdown changed for item:', itemIndex);
+                    
+                    if (optionLabel && optionDropdown) {
+                        const selectedItem = document.getElementById(`item${itemIndex}`);
+                        const selectedOption = selectedItem.options[selectedItem.selectedIndex];
+                        
+                        console.log('Selected item:', selectedItem);
+                        console.log('Selected option:', selectedOption);
+                        console.log('Dataset:', selectedOption.dataset);
+                        
+                        if (selectedOption.dataset.options) {
+                            const options = JSON.parse(selectedOption.dataset.options);
+                            console.log('Parsed options:', options);
+                            
+                            if (options && options.length > 0) {
+                                console.log('Showing options dropdown');
+                                optionLabel.classList.remove('hidden');
+                                optionDropdown.classList.remove('hidden');
+                                optionDropdown.disabled = false;
+
+                                optionDropdown.innerHTML = '';
+                                const defaultOption = document.createElement('option');
+                                defaultOption.value = '';
+                                defaultOption.textContent = 'Select option';
+                                defaultOption.disabled = true;
+                                defaultOption.selected = true;
+                                optionDropdown.appendChild(defaultOption);
+
+                                options.forEach(option => {
+                                    const optionElement = document.createElement('option');
+                                    optionElement.value = option;
+                                    optionElement.textContent = option;
+                                    optionDropdown.appendChild(optionElement);
+                                });
+
+                                // Hide quantity input when showing options
+                                if (quantityInput) {
+                                    quantityInput.style.display = 'none';
+                                    quantityInput.removeAttribute('required');
+                                    quantityInput.value = '';
+                                }
+                            } else {
+                                console.log('No options available, showing quantity input');
+                                optionLabel.classList.add('hidden');
+                                optionDropdown.classList.add('hidden');
+                                optionDropdown.disabled = true;
+                                // Show quantity input if no options
+                                if (quantityInput) {
+                                    quantityInput.style.display = 'block';
+                                    quantityInput.setAttribute('required', '');
+                                }
+                            }
+                        } else {
+                            console.log('No options in dataset');
+                        }
+                    } else {
+                        console.log('Option label or dropdown not found');
+                    }
+                    checkItemSelection();
+                } else if (e.target.classList.contains('option-dropdown')) {
+                    const itemIndex = e.target.id.replace('option', '');
+                    const selectedOption = e.target.options[e.target.selectedIndex];
+                    const quantityInput = e.target.parentElement.querySelector('input[type="number"]');
+                    
+                    if (quantityInput) {
+                        if (selectedOption.value) {
+                            // Show quantity input after option is selected
+                            quantityInput.style.display = 'block';
+                            quantityInput.setAttribute('required', '');
+                        } else {
+                            quantityInput.style.display = 'none';
+                            quantityInput.removeAttribute('required');
+                            quantityInput.value = '';
+                        }
+                    }
+                    checkItemSelection();
+                }
+            });
+
+            // Add event listener for quantity changes
+            document.addEventListener('input', function(e) {
+                if (e.target.type === 'number') {
+                    checkItemSelection();
+                }
+            });
         }
 
         // Load dropdown data from JSON
         function loadDropDown() {
-            // Get data URL based on environment (local vs production)
-            const dataUrl = '/public/data.json'; // Directly reference the static file
+            const dataUrl = 'data.json'; 
 
             fetch(dataUrl)
                 .then(response => {
@@ -195,7 +462,15 @@
                         throw new Error('Invalid data format');
                     }
                     
+                    // Clear existing options except the first one
                     dropdown = document.getElementById('item0');
+                    if (!dropdown) {
+                        console.error('Item dropdown not found');
+                        return;
+                    }
+                    
+                    dropdown.innerHTML = '';
+                    
                     // Add default option
                     const defaultOption = document.createElement('option');
                     defaultOption.value = '';
@@ -209,7 +484,11 @@
                         const option = document.createElement('option');
                         option.value = item.name;
                         option.textContent = item.name;
+                        // Store all item data in dataset
                         option.dataset.price = item.price;
+                        option.dataset.size = item.size;
+                        option.dataset.options = JSON.stringify(item.options || []);
+                        option.dataset.description = item.description || '';
                         dropdown.appendChild(option);
                     });
 
@@ -219,7 +498,9 @@
                 .catch(error => {
                     console.error('Error loading items data:', error);
                     const dropdown = document.getElementById('item0');
-                    dropdown.innerHTML = '<option value="" disabled selected>Error loading items</option>';
+                    if (dropdown) {
+                        dropdown.innerHTML = '<option value="" disabled selected>Error loading items</option>';
+                    }
                     alert('Error loading items. Please refresh the page or try again later.');
                 });
         }
@@ -230,14 +511,51 @@
             const newItem = document.createElement('div');
             newItem.classList.add('item');
 
+            // Clone the original dropdown with all its options
             const newDropdown = dropdown.cloneNode(true);
             newDropdown.id = `item${itemCount}`;
             newDropdown.name = `items[${itemCount}][description]`;
+            newDropdown.selectedIndex = 0; // Reset to default option
+
+            const newSizeLabel = document.createElement('label');
+            newSizeLabel.htmlFor = `size${itemCount}`;
+            newSizeLabel.textContent = 'Size:';
+            newSizeLabel.classList.add('size-label', 'hidden');
+
+            const newSizeDropdown = document.createElement('select');
+            newSizeDropdown.id = `size${itemCount}`;
+            newSizeDropdown.name = `items[${itemCount}][size]`;
+            newSizeDropdown.classList.add('size-dropdown', 'hidden');
+            newSizeDropdown.disabled = true;
+
+            const newOptionLabel = document.createElement('label');
+            newOptionLabel.htmlFor = `option${itemCount}`;
+            newOptionLabel.textContent = 'Options:';
+            newOptionLabel.classList.add('option-label', 'hidden');
+
+            const newOptionDropdown = document.createElement('select');
+            newOptionDropdown.id = `option${itemCount}`;
+            newOptionDropdown.name = `items[${itemCount}][option]`;
+            newOptionDropdown.classList.add('option-dropdown', 'hidden');
+            newOptionDropdown.disabled = true;
+
+            const newDescription = document.createElement('div');
+            newDescription.id = `description${itemCount}`;
+            newDescription.classList.add('description-container');
+            newDescription.innerHTML = `
+                <label>Description:</label>
+                <span class="item-description"></span>
+            `;
 
             newItem.innerHTML = `
                 <label for="${newDropdown.id}">Select an item:</label>
                 ${newDropdown.outerHTML}
-                <input type="number" name="items[${itemCount}][quantity]" placeholder="Quantity" style="display: none;">
+                ${newSizeLabel.outerHTML}
+                ${newSizeDropdown.outerHTML}
+                ${newOptionLabel.outerHTML}
+                ${newOptionDropdown.outerHTML}
+                <input type="number" name="items[${itemCount}][quantity]" placeholder="Quantity" style="display: none;" inputmode="numeric" pattern="[0-9]*">
+                ${newDescription.outerHTML}
                 <label id="price${itemCount}" style="display: none;">Price: R0.00</label>
             `;
 
@@ -272,30 +590,24 @@
             });
             
             // Define margin spaces
-            const leftMargin = 25;  // Increased left margin
-            const topMargin = 25;   // Increased top margin
-            const rightMargin = 185; // Reduced from 195 to create more right margin
+            const leftMargin = 25;  
+            const topMargin = 25;   
+            const rightMargin = 185;
             
-            // Add company logo - improve size and positioning with increased margins
             if (logoLoaded) {
-                // Calculate logo dimensions to maintain aspect ratio
-                const logoWidth = 72; // Increased by 30% from 55
+                const logoWidth = 72; 
                 const logoAspectRatio = companyLogo.height / companyLogo.width;
                 const logoHeight = logoWidth * logoAspectRatio;
                 
-                // Position logo with increased top and left margins
                 doc.addImage(companyLogo, 'PNG', leftMargin - 10, topMargin, logoWidth, Math.min(logoHeight, 52)); // Height cap increased proportionally
             }
             
-            // Add company information - right-aligned with increased top margin
             doc.setFontSize(8);
             doc.setFont(undefined, 'normal');
             doc.text('Ukuza Kwenkosi Enterprises trading as Ukuza Kivenkosi Enterprises', rightMargin, topMargin + 15, { align: 'right' });
             doc.text('Reg No 2012/750142/07 TAX No. 9278518254', rightMargin, topMargin + 20, { align: 'right' });
             doc.text('E2144 Osizeni, Newcastle, KiaZulu-Natal, 2952', rightMargin, topMargin + 25, { align: 'right' });
             
-           
-            // Add customer information - adjusted for new margins
             let customerInfoTopMargin = 55;
             doc.setFontSize(10);
             const quoteNo = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
@@ -312,13 +624,31 @@
             
             let totalAmount = 0;
             
-            // Add item rows to table
             items.forEach(item => {
                 const total = item.price * item.quantity * 1.15; // Add 15% VAT
                 totalAmount += total;
                 
+                // Split description into two lines if it's too long
+                const description = item.description;
+                const maxLength = 40; // Maximum characters per line
+                let formattedDescription = description;
+                
+                if (description.length > maxLength) {
+                    // Find a good breaking point (space or dash)
+                    let breakPoint = description.lastIndexOf(' ', maxLength);
+                    if (breakPoint === -1) {
+                        breakPoint = description.lastIndexOf('-', maxLength);
+                    }
+                    if (breakPoint === -1) {
+                        breakPoint = maxLength;
+                    }
+                    
+                    formattedDescription = description.substring(0, breakPoint) + '\n' + 
+                                        description.substring(breakPoint + 1);
+                }
+                
                 tableRows.push([
-                    item.description,
+                    formattedDescription,
                     formatCurrency(item.price),
                     item.quantity,
                     formatCurrency(total)
@@ -334,16 +664,23 @@
                 theme: 'grid',
                 headStyles: {
                     fillColor: logoPrimaryColor, // Use darker red for header
-                    textColor: 255
+                    textColor: 255,
+                    halign: 'center' // Center align all header cells
                 },
                 alternateRowStyles: {
                     fillColor: logoSecondaryColor // Use extracted secondary color from logo
                 },
-                foot: [['', '', 'Total:', formatCurrency(totalAmount)]],
+                foot: [['', '', { content: 'Total:', styles: { halign: 'center' } }, { content: formatCurrency(totalAmount), styles: { halign: 'center' } }]],
                 footStyles: {
-                    fillColor: footerColor, // Use light grey for footer
-                    textColor: [0, 0, 0], // Set footer font color to black
+                    fillColor: footerColor,
+                    textColor: [0, 0, 0],
                     fontStyle: 'bold'
+                },
+                columnStyles: {
+                    0: { cellWidth: 'auto' }, // Description column
+                    1: { cellWidth: 30, halign: 'center' }, // Price column
+                    2: { cellWidth: 20, halign: 'center' }, // Quantity column
+                    3: { cellWidth: 40, halign: 'center' } // Total column
                 }
             });
             
@@ -404,47 +741,31 @@
             for (let i = 0; i < itemCount; i++) {
                 const description = formData.get(`items[${i}][description]`);
                 const quantity = formData.get(`items[${i}][quantity]`);
-                const priceElement = document.getElementById(`price${i}`);
+                const selectedOption = document.getElementById(`item${i}`).options[document.getElementById(`item${i}`).selectedIndex];
                 
-                // Only add items that have been selected and have quantity
                 if (description && quantity) {
                     items.push({
-                        description: description,
+                        description: `${description} - ${selectedOption.dataset.size}${selectedOption.dataset.description ? ` (${selectedOption.dataset.description})` : ''}`,
                         quantity: parseFloat(quantity),
-                        price: parseFloat(priceElement.textContent.replace('Price: R', '').replace(',', ''))
+                        price: parseFloat(selectedOption.dataset.price)
                     });
                 }
             }
 
             try {
-                // Check if logo is loaded before generating PDF
                 if (!logoLoaded) {
                     console.warn("Logo not loaded yet, attempting to reload...");
-                    // Try to reload the logo
                     preloadLogo();
-                    // Wait a moment for logo to load
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
                 
-                // Generate PDF on the client side
                 const pdfBlob = generatePDF(customer, items);
                 const pdfUrl = URL.createObjectURL(pdfBlob);
 
-                // Create a filename based on the current date, client name, and quote number
-                const date = new Date().toISOString().split('T')[0]; // Format: YYYY-MM-DD
-                const clientName = customer.name.replace(/\s+/g, '_'); // Replace spaces with underscores
-                const quoteNo = Math.floor(Math.random() * 1000).toString().padStart(3, '0'); // Generate quote number
-                const fileName = `${date}_${clientName}_${quoteNo}.pdf`;
+                // Open PDF in new tab instead of downloading
+                window.open(pdfUrl, '_blank');
 
-                // Automatically open PDF in new tab with the constructed filename
-                const link = document.createElement('a');
-                link.href = pdfUrl;
-                link.download = fileName; // Set the filename for download
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-
-                // Clean up object URL when done
+                // Clean up the URL object after a delay
                 setTimeout(() => {
                     URL.revokeObjectURL(pdfUrl);
                 }, 3000);
@@ -454,42 +775,6 @@
                 alert('Error generating PDF. Please try again.');
             }
         });
-
-        // Add event listener for price updates
-        document.addEventListener('change', function(e) {
-            if (e.target.classList.contains('item-dropdown')) {
-                const itemIndex = e.target.id.replace('item', '');
-                const selectedOption = e.target.options[e.target.selectedIndex];
-                const priceLabel = document.getElementById(`price${itemIndex}`);
-                const quantityInput = e.target.parentElement.querySelector('input[type="number"]');
-                
-                if (selectedOption.value) {
-                    const price = selectedOption.dataset.price;
-                    priceLabel.textContent = `Price: R${price}`;
-                    priceLabel.style.display = 'block';
-                    quantityInput.style.display = 'block';
-                    quantityInput.setAttribute('required', '');
-                } else {
-                    priceLabel.style.display = 'none';
-                    quantityInput.style.display = 'none';
-                    quantityInput.removeAttribute('required');
-                    quantityInput.value = ''; // Clear the value when hiding
-                }
-
-                // Check item selection status
-                checkItemSelection();
-            }
-        });
-
-        // Add event listener for quantity changes
-        document.addEventListener('input', function(e) {
-            if (e.target.type === 'number') {
-                checkItemSelection();
-            }
-        });
-
-        // Load dropdown on page load
-        loadDropDown();
     </script>
 </body>
 </html>

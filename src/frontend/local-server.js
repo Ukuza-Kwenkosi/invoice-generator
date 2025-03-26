@@ -19,15 +19,13 @@ app.get('/', (req, res) => {
 
 // Data endpoint for the dropdown items
 app.get('/data.json', (req, res) => {
-  // Sample data
-  const data = [
-    { name: "Pine Board 20mm", price: 250.00 },
-    { name: "Oak Panel 12mm", price: 475.00 },
-    { name: "Meranti Timber 16mm", price: 320.00 },
-    { name: "Birch Plywood 18mm", price: 410.00 }
-  ];
-  
-  res.json(data);
+  res.sendFile(path.join(__dirname, 'public', 'data.json'));
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).send('Something broke!');
 });
 
 // Try to find an available port if 3000 is in use
