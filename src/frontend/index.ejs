@@ -467,7 +467,9 @@
             let totalAmount = 0;
             
             items.forEach(item => {
-                const total = item.price * item.quantity * 1.15; // Add 15% VAT
+                const VAT = 1.15;
+                const total = item.price * item.quantity * VAT; // Add 15% VAT
+                const price = item.price * VAT;
                 totalAmount += total;
                 
                 // Split description into two lines if it's too long
@@ -491,7 +493,7 @@
                 
                 tableRows.push([
                     formattedDescription,
-                    formatCurrency(item.price),
+                    formatCurrency(price),
                     item.quantity,
                     formatCurrency(total)
                 ]);

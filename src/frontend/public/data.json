@@ -40,5 +40,9 @@
     {
         "name": "Crating",
         "price": 1500
+    },
+    {
+        "name": "Fittings",
+        "price": 65
     }
 ]
