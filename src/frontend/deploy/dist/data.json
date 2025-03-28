@@ -1,10 +1,18 @@
 [
     {
         "name": "Carpet Pinboard",
-        "size": "1.2m h x 2.4m w",
+        "sizes": [
+            {
+                "size": "1.2m h x 2.4m w",
+                "price": 2136
+            },
+            {
+                "size": "1.2m h x 1.8m w",
+                "price": 1702
+            }
+        ],
         "options": ["Grey", "Brown", "Blue"],
-        "description": "Carpet pinboard with Aluminium frame",
-        "price": 2136
+        "description": "Carpet pinboard with Aluminium frame"
     },
     {
         "name": "Classic Magnetic Steel",
@@ -16,13 +24,14 @@
     {
         "name": "Classic Magnetic Steel - Folding",
         "sizes": [
+            
+            {
+                "size": "1.14m h x 3.6m",
+                "price": 14496
+            },
             {
                 "size": "1.14m h x 4.8m",
                 "price": 18972
-            },
-            {
-                "size": "1.14m h x 3.6m",
-                "price": 14229
             }
         ],
         "options": ["Chalk", "White"],
@@ -38,12 +47,12 @@
     {
         "name": "Pinboard Fittings",
         "size": "2.4m+",
-        "price": 800
+        "price": 65
     },
     {
         "name": "Classic writing board fittings",
         "size": "2.4m+",
-        "price": 1000
+        "price": 95
     },
     {
         "name": "Crating",
