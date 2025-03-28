@@ -50,16 +50,7 @@ function checkItemSelection() {
 
 // Update event listeners
 function setupEventListeners() {
-    document.addEventListener('change', function(e) {
-        if (e.target.classList.contains('item-dropdown')) {
-            handleItemSelection(e.target.id);
-        } else if (e.target.classList.contains('size-dropdown')) {
-            handleSizeSelection(e.target.id);
-        } else if (e.target.classList.contains('option-dropdown')) {
-            handleOptionSelection(e.target.id);
-        }
-    });
-
+    // Remove the old event listeners since we're using component-based approach
     document.addEventListener('input', function(e) {
         if (e.target.type === 'number') {
             checkItemSelection();
@@ -67,137 +58,272 @@ function setupEventListeners() {
     });
 }
 
-// Load dropdown data from JSON
-function loadDropDown() {
-    const dataUrl = 'data.json'; 
+// Item Selector Component
+class ItemSelectorComponent {
+    constructor(id) {
+        this.id = id;
+        this.element = this.create();
+        this.setupEventListeners();
+        this.loadData();
+    }
 
-    fetch(dataUrl)
-        .then(response => {
+    async loadData() {
+        try {
+            const response = await fetch('data.json');
             if (!response.ok) {
                 throw new Error('Network response was not ok');
             }
-            return response.json();
-        })
-        .then(data => {
+            const data = await response.json();
+            
             if (!Array.isArray(data)) {
                 throw new Error('Invalid data format');
             }
-            
-            dropdown = document.getElementById('item0');
-            if (!dropdown) {
-                console.error('Item dropdown not found');
-                return;
+
+            // Clear existing options except the default one
+            while (this.dropdown.options.length > 1) {
+                this.dropdown.remove(1);
             }
-            
-            dropdown.innerHTML = '';
-            
-            const defaultOption = document.createElement('option');
-            defaultOption.value = '';
-            defaultOption.textContent = 'Select board';
-            defaultOption.disabled = true;
-            defaultOption.selected = true;
-            dropdown.appendChild(defaultOption);
-            
+
+            // Populate the dropdown with options
             data.forEach(item => {
                 const option = document.createElement('option');
                 option.value = item.name;
                 option.textContent = item.name;
-                // Store the entire item object in the dataset
-                option.dataset.itemData = JSON.stringify(item);
-                dropdown.appendChild(option);
+                
+                // Store the complete item data
+                option.dataset.itemData = JSON.stringify({
+                    name: item.name,
+                    description: item.description,
+                    price: item.price,
+                    sizes: item.sizes,
+                    options: item.options
+                });
+                
+                this.dropdown.appendChild(option);
             });
 
-            checkItemSelection();
-        })
-        .catch(error => {
+        } catch (error) {
             console.error('Error loading items data:', error);
-            const dropdown = document.getElementById('item0');
-            if (dropdown) {
-                dropdown.innerHTML = '<option value="" disabled selected>Error loading items</option>';
-            }
             alert('Error loading items. Please refresh the page or try again later.');
-        });
+        }
+    }
+
+    create() {
+        const template = document.getElementById('itemSelectorTemplate');
+        const content = template.content.cloneNode(true);
+        
+        // Store references to elements
+        this.dropdown = content.querySelector('.item-dropdown');
+        this.descriptionGroup = content.querySelector('#descriptionGroup');
+        this.description = content.querySelector('.item-description');
+        this.sizeLabel = content.querySelector('.size-label');
+        this.sizeDropdown = content.querySelector('.size-dropdown');
+        this.optionLabel = content.querySelector('.option-label');
+        this.optionDropdown = content.querySelector('.option-dropdown');
+        this.quantityInput = content.querySelector('input[type="number"]');
+        this.priceLabel = content.querySelector('#price');
+        
+        return content;
+    }
+
+    setupEventListeners() {
+        // Get references to all elements we need
+        this.dropdown = this.element.querySelector('.item-dropdown');
+        this.sizeDropdown = this.element.querySelector('.size-dropdown');
+        this.optionDropdown = this.element.querySelector('.option-dropdown');
+        this.quantityInput = this.element.querySelector('input[type="number"]');
+        this.descriptionGroup = this.element.querySelector('.form-group');
+        this.descriptionSpan = this.descriptionGroup.querySelector('.item-description');
+        this.priceLabel = this.element.querySelector('#price');
+        this.sizeLabel = this.element.querySelector('.size-label');
+        this.optionLabel = this.element.querySelector('.option-label');
+
+        if (!this.dropdown || !this.sizeDropdown || !this.optionDropdown || !this.quantityInput || 
+            !this.descriptionGroup || !this.descriptionSpan || !this.priceLabel || 
+            !this.sizeLabel || !this.optionLabel) {
+            throw new Error('Required elements not found in container');
+        }
+
+        // Bind event handlers to this instance
+        this.dropdown.addEventListener('change', () => this.handleItemSelection());
+        this.sizeDropdown.addEventListener('change', () => this.handleSizeSelection());
+        this.optionDropdown.addEventListener('change', () => this.handleOptionSelection());
+        this.quantityInput.addEventListener('input', () => checkItemSelection());
+    }
+
+    handleItemSelection() {
+        // Reset all fields
+        this.descriptionGroup.style.display = 'none';
+        this.descriptionSpan.textContent = '';
+        this.priceLabel.style.display = 'none';
+        this.priceLabel.textContent = 'Price: R0.00';
+        this.sizeDropdown.innerHTML = '<option value="" disabled selected>Select size</option>';
+        this.optionDropdown.innerHTML = '<option value="" disabled selected>Select option</option>';
+        this.quantityInput.style.display = 'none';
+        this.quantityInput.value = '';
+
+        // Hide controls initially
+        this.sizeLabel.classList.add('hidden');
+        this.sizeDropdown.classList.add('hidden');
+        this.optionLabel.classList.add('hidden');
+        this.optionDropdown.classList.add('hidden');
+
+        if (this.dropdown.value) {
+            const selectedOption = this.dropdown.options[this.dropdown.selectedIndex];
+            const itemData = JSON.parse(selectedOption.dataset.itemData);
+            const description = itemData.description;
+
+            // Show description
+            if (description && description !== 'undefined') {
+                this.descriptionGroup.style.display = 'block';
+                this.descriptionSpan.textContent = description;
+            }
+
+            // Handle sizes and prices
+            if (itemData.sizes) {
+                this.sizeLabel.classList.remove('hidden');
+                this.sizeDropdown.classList.remove('hidden');
+                this.sizeDropdown.disabled = false;
+                this.sizeDropdown.innerHTML = '<option value="" disabled selected>Select size</option>';
+                
+                itemData.sizes.forEach(sizeData => {
+                    const sizeOption = document.createElement('option');
+                    sizeOption.value = sizeData.size;
+                    sizeOption.textContent = sizeData.size;
+                    sizeOption.dataset.price = sizeData.price;
+                    this.sizeDropdown.appendChild(sizeOption);
+                });
+            } else if (itemData.size) {
+                this.sizeLabel.classList.remove('hidden');
+                this.sizeDropdown.classList.remove('hidden');
+                this.sizeDropdown.disabled = false;
+                this.sizeDropdown.innerHTML = '<option value="" disabled selected>Select size</option>';
+                
+                const sizeOption = document.createElement('option');
+                sizeOption.value = itemData.size;
+                sizeOption.textContent = itemData.size;
+                sizeOption.dataset.price = itemData.price;
+                this.sizeDropdown.appendChild(sizeOption);
+                
+                this.sizeDropdown.value = itemData.size;
+                this.handleSizeSelection();
+            } else {
+                this.priceLabel.textContent = `Price: R${itemData.price}`;
+                this.priceLabel.style.display = 'block';
+                this.quantityInput.style.display = 'block';
+                this.quantityInput.setAttribute('required', '');
+            }
+
+            // Handle options
+            if (itemData.options && itemData.options.length > 0) {
+                this.optionLabel.classList.remove('hidden');
+                this.optionDropdown.classList.remove('hidden');
+                this.optionDropdown.disabled = false;
+                this.optionDropdown.innerHTML = '<option value="" disabled selected>Select option</option>';
+                
+                itemData.options.forEach(option => {
+                    const optionElement = document.createElement('option');
+                    optionElement.value = option;
+                    optionElement.textContent = option;
+                    this.optionDropdown.appendChild(optionElement);
+                });
+            }
+        }
+
+        checkItemSelection();
+    }
+
+    handleSizeSelection() {
+        // Reset option dropdown and hide controls
+        this.optionDropdown.innerHTML = '<option value="" disabled selected>Select option</option>';
+        this.optionLabel.classList.add('hidden');
+        this.optionDropdown.classList.add('hidden');
+        this.optionDropdown.disabled = true;
+        this.quantityInput.style.display = 'none';
+        this.quantityInput.value = '';
+
+        if (this.sizeDropdown.value) {
+            const selectedSizeOption = this.sizeDropdown.options[this.sizeDropdown.selectedIndex];
+            const price = selectedSizeOption.dataset.price;
+            this.priceLabel.textContent = `Price: R${price}`;
+            this.priceLabel.style.display = 'block';
+
+            const itemData = JSON.parse(this.dropdown.options[this.dropdown.selectedIndex].dataset.itemData);
+            const options = itemData.options || [];
+
+            if (options.length > 0) {
+                this.optionLabel.classList.remove('hidden');
+                this.optionDropdown.classList.remove('hidden');
+                this.optionDropdown.disabled = false;
+                this.optionDropdown.innerHTML = '<option value="" disabled selected>Select option</option>';
+                
+                options.forEach(option => {
+                    const optionElement = document.createElement('option');
+                    optionElement.value = option;
+                    optionElement.textContent = option;
+                    this.optionDropdown.appendChild(optionElement);
+                });
+
+                if (options.length === 1) {
+                    this.optionDropdown.value = options[0];
+                    this.handleOptionSelection();
+                }
+            } else {
+                this.quantityInput.style.display = 'block';
+                this.quantityInput.setAttribute('required', '');
+            }
+        }
+
+        checkItemSelection();
+    }
+
+    handleOptionSelection() {
+        const optionDropdown = this.optionDropdown;
+        const quantityInput = this.quantityInput;
+
+        if (optionDropdown.value) {
+            quantityInput.style.display = 'block';
+            quantityInput.setAttribute('required', '');
+        } else {
+            quantityInput.style.display = 'none';
+            quantityInput.removeAttribute('required');
+            quantityInput.value = '';
+        }
+
+        checkItemSelection();
+    }
+
+    getElement() {
+        return this.element;
+    }
 }
 
-// Add a new item row
+// Update the addItem function to use the new component
 function addItem() {
     const itemsDiv = document.getElementById('items');
-    const newItem = document.createElement('div');
-    newItem.classList.add('item');
-
-    const newDropdown = document.createElement('select');
-    newDropdown.id = `item${itemCount}`;
-    newDropdown.name = `items[${itemCount}][description]`;
-    newDropdown.classList.add('item-dropdown');
-    
-    const defaultOption = document.createElement('option');
-    defaultOption.value = '';
-    defaultOption.textContent = 'Select board';
-    defaultOption.disabled = true;
-    defaultOption.selected = true;
-    newDropdown.appendChild(defaultOption);
-    
-    const originalDropdown = document.getElementById('item0');
-    Array.from(originalDropdown.options).slice(1).forEach(option => {
-        const newOption = document.createElement('option');
-        newOption.value = option.value;
-        newOption.textContent = option.textContent;
-        newOption.dataset.price = option.dataset.price;
-        newOption.dataset.size = option.dataset.size;
-        newOption.dataset.options = option.dataset.options;
-        newOption.dataset.description = option.dataset.description;
-        newDropdown.appendChild(newOption);
-    });
-
-    const newSizeLabel = document.createElement('label');
-    newSizeLabel.htmlFor = `size${itemCount}`;
-    newSizeLabel.textContent = 'Size:';
-    newSizeLabel.classList.add('size-label', 'hidden');
-
-    const newSizeDropdown = document.createElement('select');
-    newSizeDropdown.id = `size${itemCount}`;
-    newSizeDropdown.name = `items[${itemCount}][size]`;
-    newSizeDropdown.classList.add('size-dropdown', 'hidden');
-    newSizeDropdown.disabled = true;
-    newSizeDropdown.value = '';
-
-    const newOptionLabel = document.createElement('label');
-    newOptionLabel.htmlFor = `option${itemCount}`;
-    newOptionLabel.textContent = 'Options:';
-    newOptionLabel.classList.add('option-label', 'hidden');
-
-    const newOptionDropdown = document.createElement('select');
-    newOptionDropdown.id = `option${itemCount}`;
-    newOptionDropdown.name = `items[${itemCount}][option]`;
-    newOptionDropdown.classList.add('option-dropdown', 'hidden');
-    newOptionDropdown.disabled = true;
-    newOptionDropdown.value = '';
-
-    const newDescriptionGroup = document.createElement('div');
-    newDescriptionGroup.id = `descriptionGroup${itemCount}`;
-    newDescriptionGroup.classList.add('form-group');
-    newDescriptionGroup.style.display = 'none';
-    newDescriptionGroup.innerHTML = `
-        <label>Description:</label>
-        <div id="description${itemCount}" class="description-container">
-            <span class="item-description"></span>
-        </div>
-    `;
-
-    newItem.innerHTML = `
-        <label for="${newDropdown.id}">Select an item:</label>
-        ${newDropdown.outerHTML}
-        ${newDescriptionGroup.outerHTML}
-        ${newSizeLabel.outerHTML}
-        ${newSizeDropdown.outerHTML}
-        ${newOptionLabel.outerHTML}
-        ${newOptionDropdown.outerHTML}
-        <input type="number" name="items[${itemCount}][quantity]" placeholder="Quantity" style="display: none;" inputmode="numeric" pattern="[0-9]*">
-        <label id="price${itemCount}" style="display: none;">Price: R0.00</label>
-    `;
-
-    itemsDiv.appendChild(newItem);
+    const itemSelector = new ItemSelectorComponent(itemCount);
+    itemsDiv.appendChild(itemSelector.getElement());
     itemCount++;
+}
+
+// Update the loadDropDown function to only create the initial component
+function loadDropDown() {
+    const itemsDiv = document.getElementById('items');
+    if (!itemsDiv) {
+        throw new Error('Items container not found');
+    }
+    
+    itemsDiv.innerHTML = ''; // Clear existing items
+    
+    // Create initial item selector
+    const itemSelector = new ItemSelectorComponent(0);
+    const element = itemSelector.getElement();
+    if (!element) {
+        throw new Error('Failed to create item selector element');
+    }
+    
+    itemsDiv.appendChild(element);
+    checkItemSelection();
 }
 
 // Customer class
@@ -244,10 +370,11 @@ function generatePDF(customer, items) {
     doc.text('E2144 Osizeni, Newcastle, KiaZulu-Natal, 2952', rightMargin, topMargin + 25, { align: 'right' });
     
     let customerInfoTopMargin = 55;
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     const quoteNo = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
     doc.text(`Quote #: ${quoteNo}`, rightMargin, topMargin + customerInfoTopMargin, { align: 'right' });
     doc.text(`Date: ${new Date().toLocaleDateString()}`, rightMargin, topMargin + customerInfoTopMargin + 5, { align: 'right' });
+    
     doc.text(`Name: ${customer.name}`, leftMargin, topMargin + customerInfoTopMargin);
     doc.text(`Address: ${customer.address}`, leftMargin, topMargin + customerInfoTopMargin + 5);
     doc.text(`Email: ${customer.email}`, leftMargin, topMargin + customerInfoTopMargin + 10);
@@ -264,25 +391,8 @@ function generatePDF(customer, items) {
         const price = item.price * VAT;
         totalAmount += total;
         
-        const description = item.description;
-        const maxLength = 40;
-        let formattedDescription = description;
-        
-        if (description.length > maxLength) {
-            let breakPoint = description.lastIndexOf(' ', maxLength);
-            if (breakPoint === -1) {
-                breakPoint = description.lastIndexOf('-', maxLength);
-            }
-            if (breakPoint === -1) {
-                breakPoint = maxLength;
-            }
-            
-            formattedDescription = description.substring(0, breakPoint) + '\n' + 
-                                description.substring(breakPoint + 1);
-        }
-        
         tableRows.push([
-            formattedDescription,
+            item.description,
             formatCurrency(price),
             item.quantity,
             formatCurrency(total)
@@ -298,22 +408,30 @@ function generatePDF(customer, items) {
         headStyles: {
             fillColor: logoPrimaryColor,
             textColor: 255,
-            halign: 'center'
+            halign: 'center',
+            fontSize: 8,
+            cellPadding: 2
         },
         alternateRowStyles: {
             fillColor: logoSecondaryColor
         },
-        foot: [['', '', { content: 'Total:', styles: { halign: 'center' } }, { content: formatCurrency(totalAmount), styles: { halign: 'center' } }]],
+        foot: [['', '', { content: 'Total', styles: { halign: 'center', fontSize: 8, cellPadding: 2 } }, { content: formatCurrency(totalAmount), styles: { halign: 'center', fontSize: 8, cellPadding: 2 } }]],
         footStyles: {
             fillColor: footerColor,
             textColor: [0, 0, 0],
-            fontStyle: 'bold'
+            fontStyle: 'bold',
+            fontSize: 8,
+            cellPadding: 2
         },
         columnStyles: {
-            0: { cellWidth: 'auto' },
-            1: { cellWidth: 30, halign: 'center' },
-            2: { cellWidth: 20, halign: 'center' },
-            3: { cellWidth: 40, halign: 'center' }
+            0: { cellWidth: 'auto', cellPadding: 2 },
+            1: { cellWidth: 30, halign: 'center', cellPadding: 2 },
+            2: { cellWidth: 20, halign: 'center', cellPadding: 2 },
+            3: { cellWidth: 40, halign: 'center', cellPadding: 2 }
+        },
+        styles: {
+            fontSize: 8,
+            cellPadding: 2
         }
     });
     
@@ -324,11 +442,10 @@ function generatePDF(customer, items) {
     doc.text('Branch Code: 450105', leftMargin, finalY + 51);
     doc.text('Swift code: CABLZAJJ', leftMargin, finalY + 58);
     
-    doc.setFontSize(10);
+    doc.setFontSize(8);
     doc.setFont(undefined, 'bold');
     doc.text('Terms & Conditions:', leftMargin, finalY + 75);
     doc.setFont(undefined, 'normal');
-    doc.setFontSize(8);
     doc.text('1. This quote is valid for 30 days from the date of issue.', leftMargin, finalY + 85);
     doc.text('2. Payment terms: 50% deposit required to confirm order.', leftMargin, finalY + 92);
     doc.text('3. Delivery time: 2-3 weeks after confirmation of order.', leftMargin, finalY + 99);
@@ -365,39 +482,63 @@ document.getElementById('invoiceForm').addEventListener('submit', async (event) 
 
     const items = [];
     for (let i = 0; i < itemCount; i++) {
-        const description = formData.get(`items[${i}][description]`);
-        const quantity = formData.get(`items[${i}][quantity]`);
-        const selectedOption = document.getElementById(`item${i}`).options[document.getElementById(`item${i}`).selectedIndex];
-        const selectedSize = document.getElementById(`size${i}`).value;
-        const selectedOptionValue = document.getElementById(`option${i}`).value;
-        
-        if (description && 
-            description !== 'undefined' && 
-            description !== 'null' && 
-            description.trim() !== '' && 
-            quantity && 
-            parseFloat(quantity) > 0) {
-            
-            const size = selectedOption.dataset.size;
-            const itemDescription = selectedOption.dataset.description;
-            
-            let fullDescription = description;
-            if (size && size !== 'undefined' && size !== 'null') {
-                fullDescription += ` - ${size}`;
-            }                   
-            if (itemDescription && itemDescription !== 'undefined' && itemDescription !== 'null') {
-                fullDescription += ` (${itemDescription})`;
-            }
-            if (selectedOptionValue && selectedOptionValue !== 'undefined' && selectedOptionValue !== 'null') {
-                fullDescription += ` - ${selectedOptionValue}`;
-            }
-            
-            items.push({
-                description: fullDescription,
-                quantity: parseFloat(quantity),
-                price: parseFloat(selectedOption.dataset.price)
-            });
+        const itemContainer = document.querySelector(`#items .item:nth-child(${i + 1})`);
+        if (!itemContainer) continue;
+
+        const itemDropdown = itemContainer.querySelector('.item-dropdown');
+        const sizeDropdown = itemContainer.querySelector('.size-dropdown');
+        const optionDropdown = itemContainer.querySelector('.option-dropdown');
+        const quantityInput = itemContainer.querySelector('input[type="number"]');
+
+        if (!itemDropdown || !quantityInput) continue;
+
+        const selectedOption = itemDropdown.options[itemDropdown.selectedIndex];
+        if (!selectedOption || !selectedOption.value) continue;
+
+        const quantity = parseFloat(quantityInput.value);
+        if (!quantity || quantity <= 0) continue;
+
+        // Get the item data
+        const itemData = JSON.parse(selectedOption.dataset.itemData);
+        if (!itemData) continue;
+
+        let price = parseFloat(itemData.price);
+        let description = itemData.name;
+
+        // Add description if available
+        if (itemData.description) {
+            description += ` - ${itemData.description}`;
         }
+
+        // If size is selected, get price from size dropdown
+        if (sizeDropdown && sizeDropdown.value) {
+            const selectedSizeOption = sizeDropdown.options[sizeDropdown.selectedIndex];
+            price = parseFloat(selectedSizeOption.dataset.price);
+            description += ` - ${sizeDropdown.value}`;
+        }
+
+        // Add option if selected
+        if (optionDropdown && optionDropdown.value) {
+            description += ` - ${optionDropdown.value}`;
+        }
+
+        // Debug logging
+        console.log('Item Data:', itemData);
+        console.log('Description:', description);
+        console.log('Price:', price);
+        console.log('Quantity:', quantity);
+
+        // Validate price before adding to items
+        if (isNaN(price)) {
+            console.error('Invalid price for item:', description);
+            continue;
+        }
+        
+        items.push({
+            description: description,
+            quantity: quantity,
+            price: price
+        });
     }
 
     try {
@@ -422,186 +563,32 @@ document.getElementById('invoiceForm').addEventListener('submit', async (event) 
     }
 });
 
-// Function to handle item selection
-function handleItemSelection(dropdownId) {
-    const dropdown = document.getElementById(dropdownId);
-    const itemNumber = dropdownId.replace('item', '');
-    const descriptionGroup = document.getElementById(`descriptionGroup${itemNumber}`);
-    const descriptionSpan = descriptionGroup.querySelector('.item-description');
-    const priceLabel = document.getElementById(`price${itemNumber}`);
-    const sizeLabel = document.querySelector(`label[for="size${itemNumber}"]`);
-    const sizeDropdown = document.getElementById(`size${itemNumber}`);
-    const optionLabel = document.querySelector(`label[for="option${itemNumber}"]`);
-    const optionDropdown = document.getElementById(`option${itemNumber}`);
-    const quantityInput = document.querySelector(`input[name="items[${itemNumber}][quantity]"]`);
-
-    // Clear previous values and hide description
-    descriptionGroup.style.display = 'none';
-    descriptionSpan.textContent = '';
-    priceLabel.style.display = 'none';
-    priceLabel.textContent = 'Price: R0.00';
-    sizeDropdown.innerHTML = '<option value="" disabled selected>Select size</option>';
-    optionDropdown.innerHTML = '<option value="" disabled selected>Select option</option>';
-    quantityInput.style.display = 'none';
-    quantityInput.value = '';
-
-    // Hide size and option controls initially
-    sizeLabel.classList.add('hidden');
-    sizeDropdown.classList.add('hidden');
-    optionLabel.classList.add('hidden');
-    optionDropdown.classList.add('hidden');
-
-    if (dropdown.value) {
-        const selectedOption = dropdown.options[dropdown.selectedIndex];
-        const itemData = JSON.parse(selectedOption.dataset.itemData);
-        const description = itemData.description;
-
-        // Show description
-        if (description && description !== 'undefined') {
-            descriptionGroup.style.display = 'block';
-            descriptionSpan.textContent = description;
-        }
-
-        // Handle sizes and prices
-        if (itemData.sizes) {
-            // Item has multiple sizes with different prices
-            sizeLabel.classList.remove('hidden');
-            sizeDropdown.classList.remove('hidden');
-            sizeDropdown.disabled = false;
-            sizeDropdown.innerHTML = '<option value="" disabled selected>Select size</option>';
-            
-            itemData.sizes.forEach(sizeData => {
-                const sizeOption = document.createElement('option');
-                sizeOption.value = sizeData.size;
-                sizeOption.textContent = sizeData.size;
-                sizeOption.dataset.price = sizeData.price;
-                sizeDropdown.appendChild(sizeOption);
-            });
-        } else if (itemData.size) {
-            // Item has a single size
-            sizeLabel.classList.remove('hidden');
-            sizeDropdown.classList.remove('hidden');
-            sizeDropdown.disabled = false;
-            sizeDropdown.innerHTML = '<option value="" disabled selected>Select size</option>';
-            
-            const sizeOption = document.createElement('option');
-            sizeOption.value = itemData.size;
-            sizeOption.textContent = itemData.size;
-            sizeOption.dataset.price = itemData.price;
-            sizeDropdown.appendChild(sizeOption);
-            
-            // Auto-select size if it's the only option
-            sizeDropdown.value = itemData.size;
-            handleSizeSelection(sizeDropdown.id);
-        } else {
-            // Item has no size options
-            priceLabel.textContent = `Price: R${itemData.price}`;
-            priceLabel.style.display = 'block';
-            quantityInput.style.display = 'block';
-            quantityInput.setAttribute('required', '');
-        }
-
-        // Handle options if available
-        if (itemData.options && itemData.options.length > 0) {
-            optionLabel.classList.remove('hidden');
-            optionDropdown.classList.remove('hidden');
-            optionDropdown.disabled = false;
-            optionDropdown.innerHTML = '<option value="" disabled selected>Select option</option>';
-            
-            itemData.options.forEach(option => {
-                const optionElement = document.createElement('option');
-                optionElement.value = option;
-                optionElement.textContent = option;
-                optionDropdown.appendChild(optionElement);
-            });
-        }
-    }
-
-    // Check if all required fields are filled
-    checkItemSelection();
-}
-
-// Function to handle size selection
-function handleSizeSelection(sizeDropdownId) {
-    const sizeDropdown = document.getElementById(sizeDropdownId);
-    const itemNumber = sizeDropdownId.replace('size', '');
-    const optionLabel = document.querySelector(`label[for="option${itemNumber}"]`);
-    const optionDropdown = document.getElementById(`option${itemNumber}`);
-    const quantityInput = document.querySelector(`input[name="items[${itemNumber}][quantity]"]`);
-    const priceLabel = document.getElementById(`price${itemNumber}`);
-
-    optionDropdown.innerHTML = '<option value="" disabled selected>Select option</option>';
-    optionLabel.classList.add('hidden');
-    optionDropdown.classList.add('hidden');
-    optionDropdown.disabled = true;
-    quantityInput.style.display = 'none';
-    quantityInput.value = '';
-
-    if (sizeDropdown.value) {
-        const selectedSizeOption = sizeDropdown.options[sizeDropdown.selectedIndex];
-        const price = selectedSizeOption.dataset.price;
-        priceLabel.textContent = `Price: R${price}`;
-        priceLabel.style.display = 'block';
-
-        const selectedItem = document.getElementById(`item${itemNumber}`);
-        const itemData = JSON.parse(selectedItem.options[selectedItem.selectedIndex].dataset.itemData);
-        const options = itemData.options || [];
-
-        if (options.length > 0) {
-            optionLabel.classList.remove('hidden');
-            optionDropdown.classList.remove('hidden');
-            optionDropdown.disabled = false;
-            optionDropdown.innerHTML = '<option value="" disabled selected>Select option</option>';
-            
-            options.forEach(option => {
-                const optionElement = document.createElement('option');
-                optionElement.value = option;
-                optionElement.textContent = option;
-                optionDropdown.appendChild(optionElement);
-            });
-
-            if (options.length === 1) {
-                optionDropdown.value = options[0];
-                handleOptionSelection(optionDropdown.id);
-            }
-        } else {
-            quantityInput.style.display = 'block';
-            quantityInput.setAttribute('required', '');
-        }
-    }
-
-    checkItemSelection();
-}
-
-// Function to handle option selection
-function handleOptionSelection(optionDropdownId) {
-    const optionDropdown = document.getElementById(optionDropdownId);
-    const itemNumber = optionDropdownId.replace('option', '');
-    const quantityInput = document.querySelector(`input[name="items[${itemNumber}][quantity]"]`);
-
-    if (optionDropdown.value) {
-        quantityInput.style.display = 'block';
-        quantityInput.setAttribute('required', '');
-    } else {
-        quantityInput.style.display = 'none';
-        quantityInput.removeAttribute('required');
-        quantityInput.value = '';
-    }
-
-    checkItemSelection();
-}
-
 // Initialize when DOM is loaded
-window.addEventListener('DOMContentLoaded', function() {
-    const dropdown = document.getElementById('item0');
-    const descriptionContainer = document.getElementById('description0');
-    
-    if (!dropdown || !descriptionContainer) {
-        console.error('Required DOM elements not found');
-        return;
+window.addEventListener('DOMContentLoaded', async function() {
+    try {
+        // Load templates first
+        const response = await fetch('/templates/item-selector.html');
+        if (!response.ok) {
+            throw new Error('Failed to load template');
+        }
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const template = doc.getElementById('itemSelectorTemplate');
+        
+        if (!template) {
+            throw new Error('Item selector template not found');
+        }
+        
+        // Add template to document
+        document.body.appendChild(template);
+        
+        // Initialize the rest of the application
+        preloadLogo();
+        setupEventListeners();
+        loadDropDown();
+    } catch (error) {
+        console.error('Error initializing application:', error);
+        alert('Error loading application. Please refresh the page.');
     }
-
-    preloadLogo();
-    setupEventListeners();
-    loadDropDown();
 }); 

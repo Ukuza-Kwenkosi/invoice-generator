@@ -33,23 +33,7 @@
 
         <h3>Items:</h3>
         <div id="items">
-            <div class="item">
-                <label for="item0">Select an item:</label>
-                <select id="item0" name="items[0][description]" class="item-dropdown"></select>
-                <div class="form-group" id="descriptionGroup0" style="display: none;">
-                    <label for="description0">Description:</label>
-                    <div id="description0" class="description-container">
-                        <span class="item-description"></span>
-                    </div>
-                </div>
-                <label for="size0" class="size-label hidden">Size:</label>
-                <select id="size0" name="items[0][size]" class="size-dropdown hidden" disabled></select>
-                <label for="option0" class="option-label hidden">Options:</label>
-                <select id="option0" name="items[0][option]" class="option-dropdown hidden" disabled></select>
-                <input type="number" name="items[0][quantity]" placeholder="Quantity" style="display: none;" inputmode="numeric" pattern="[0-9]*">
-                
-                <label id="price0" style="display: none;">Price: R0.00</label>
-            </div>
+            <!-- Templates will be loaded here -->
         </div>
 
         <button type="button" id="addItemBtn" onclick="addItem()" disabled>Add Item</button>

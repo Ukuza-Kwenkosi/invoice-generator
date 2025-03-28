@@ -103,6 +103,18 @@ if (fs.existsSync(imagesSrcDir)) {
     console.warn(`Images directory ${imagesSrcDir} does not exist.`);
 }
 
+// Copy templates directory
+const templatesSrcDir = path.join(publicDir, 'templates');
+const templatesDestDir = path.join(distDir, 'templates');
+if (fs.existsSync(templatesSrcDir)) {
+    if (!fs.existsSync(templatesDestDir)) {
+        fs.mkdirSync(templatesDestDir, { recursive: true });
+    }
+    copyFiles(templatesSrcDir, templatesDestDir);
+} else {
+    console.warn(`Templates directory ${templatesSrcDir} does not exist.`);
+}
+
 // Copy data.json
 const dataSrcFile = path.join(srcDir, 'data.json');
 const dataDestFile = path.join(distDir, 'data.json');

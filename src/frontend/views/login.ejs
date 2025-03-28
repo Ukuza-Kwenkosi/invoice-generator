@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Invoice Generator Backoffice</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
+</head>
+<body class="min-h-screen bg-base-200">
+    <div class="hero min-h-screen">
+        <div class="hero-content flex-col">
+            <div class="text-center">
+                <h1 class="text-5xl font-bold">Invoice Generator</h1>
+                <p class="py-6">Backoffice Login</p>
+            </div>
+            <div class="card flex-shrink-0 w-full max-w-sm shadow-2xl bg-base-100">
+                <form class="card-body" action="/login" method="POST">
+                    <% if (messages.error) { %>
+                        <div class="alert alert-error">
+                            <span><%= messages.error %></span>
+                        </div>
+                    <% } %>
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Username</span>
+                        </label>
+                        <input type="text" name="username" class="input input-bordered" required />
+                    </div>
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Password</span>
+                        </label>
+                        <input type="password" name="password" class="input input-bordered" required />
+                    </div>
+                    <div class="form-control mt-6">
+                        <button class="btn btn-primary">Login</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html> 

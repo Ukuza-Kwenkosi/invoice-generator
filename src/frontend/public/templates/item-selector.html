@@ -1,0 +1,29 @@
+<!-- Item selector template -->
+<template id="itemSelectorTemplate">
+    <div class="item">
+        <label for="item">Select an item:</label>
+        <select id="item" name="items[][description]" class="item-dropdown">
+            <option value="" disabled selected>Please select board</option>
+        </select>
+        
+        <div id="descriptionGroup" class="form-group" style="display: none;">
+            <label>Description:</label>
+            <div id="description" class="description-container">
+                <span class="item-description"></span>
+            </div>
+        </div>
+        
+        <label for="size" class="size-label hidden">Size:</label>
+        <select id="size" name="items[][size]" class="size-dropdown hidden" disabled>
+            <option value="" disabled selected>Select size</option>
+        </select>
+        
+        <label for="option" class="option-label hidden">Options:</label>
+        <select id="option" name="items[][option]" class="option-dropdown hidden" disabled>
+            <option value="" disabled selected>Select option</option>
+        </select>
+        
+        <input type="number" name="items[][quantity]" placeholder="Quantity" style="display: none;" inputmode="numeric" pattern="[0-9]*">
+        <label id="price" style="display: none;">Price: R0.00</label>
+    </div>
+</template> 
