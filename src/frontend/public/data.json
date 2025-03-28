@@ -11,21 +11,30 @@
         "size": "1.14m h x 2.4m",
         "options": ["Chalk", "White"],
         "description": "Steel writing board c/w aluminium chalkrail",
-        "price": 18972
+        "price": 4735
     },
     {
         "name": "Classic Magnetic Steel - Folding",
-        "size": "1.14m h x 4.8m",
+        "sizes": [
+            
+            {
+                "size": "1.14m h x 3.6m",
+                "price": 14496
+            },
+            {
+                "size": "1.14m h x 4.8m",
+                "price": 18972
+            }
+        ],
         "options": ["Chalk", "White"],
-        "description": "Classic steel folding writing boards c/w aluminum chalkrail(5 pc set)",
-        "price": 18972
+        "description": "Classic steel folding writing boards c/w aluminum chalkrail(5 pc set)"
     },
     {
         "name": "Premium Magnetic",
         "size": "1.2m h x 2.4m",
         "options": ["Chalk", "White"],
         "description": "Steel writing board with Aluminium frame & Pentray",
-        "price": 3200
+        "price": 4039
     },
     {
         "name": "Pinboard Fittings",
