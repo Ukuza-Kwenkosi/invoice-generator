@@ -36,6 +36,22 @@ input {
     border-radius: 4px;
 }
 
+input[type="number"] {
+    width: 80%;
+    padding: 8px;
+    margin-top: 5px;
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
 .item {
     width: 80%;
     border: 1px solid #ddd;
@@ -127,4 +143,28 @@ button:disabled {
     margin: 0 auto 20px;
     height: 150px;
     width: auto;
+}
+
+.remove-item {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background-color: #ff4444;
+    color: white;
+    border: none;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background-color 0.2s;
+}
+
+.remove-item:hover {
+    background-color: #cc0000;
 } 

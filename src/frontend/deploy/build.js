@@ -1,126 +1,95 @@
 // build.js
 const fs = require('fs');
 const path = require('path');
-const ejs = require('ejs');
+const { execSync } = require('child_process');
 
 // Define the source and destination directories
-const srcDir = path.join(__dirname, '..'); // Move one level up to src
-const distDir = path.join(__dirname, 'dist'); // Create dist inside deploy folder
-const publicDir = path.join(srcDir, 'public'); // Path to public directory
+const frontendDir = path.join(__dirname, '..'); // Move one level up to frontend
+const distDir = path.join(frontendDir, 'deploy/dist'); // Create dist in the deploy directory
+const publicDir = path.join(frontendDir, 'public'); // Path to public directory
+
+// Function to ensure directory exists
+function ensureDirectoryExists(dir) {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+}
 
 // Create the dist directory if it doesn't exist
-if (!fs.existsSync(distDir)) {
-    fs.mkdirSync(distDir);
+ensureDirectoryExists(distDir);
+
+// Compile TypeScript files
+console.log('Compiling TypeScript files...');
+try {
+    execSync('npm run build:ts', { stdio: 'inherit' });
+    console.log('TypeScript compilation completed successfully');
+} catch (error) {
+    console.error('TypeScript compilation failed:', error);
+    process.exit(1);
 }
-
-// Function to compile EJS files
-function compileEJS(file) {
-    const filePath = path.join(srcDir, file);
-    const outputFilePath = path.join(distDir, file.replace('.ejs', '.html'));
-
-    // Read the EJS file
-    fs.readFile(filePath, 'utf8', (err, data) => {
-        if (err) {
-            console.error(`Error reading file ${filePath}:`, err);
-            return;
-        }
-
-        // Compile the EJS file
-        const html = ejs.render(data);
-
-        // Write the compiled HTML to the output file
-        fs.writeFile(outputFilePath, html, (err) => {
-            if (err) {
-                console.error(`Error writing file ${outputFilePath}:`, err);
-            } else {
-                console.log(`Compiled ${file} to ${outputFilePath}`);
-            }
-        });
-    });
-}
-
-// Compile all EJS files in the src/frontend directory
-fs.readdir(srcDir, (err, files) => {
-    if (err) {
-        console.error('Error reading source directory:', err);
-        return;
-    }
-
-    files.forEach(file => {
-        if (file.endsWith('.ejs')) {
-            compileEJS(file);
-        }
-    });
-});
 
 // Function to copy files and directories
 function copyFiles(src, dest) {
-    if (fs.lstatSync(src).isDirectory()) {
-        // Create the destination directory if it doesn't exist
-        if (!fs.existsSync(dest)) {
-            fs.mkdirSync(dest, { recursive: true }); // Ensure all parent directories are created
+    try {
+        if (fs.lstatSync(src).isDirectory()) {
+            ensureDirectoryExists(dest);
+            
+            // Read the contents of the directory
+            fs.readdirSync(src).forEach(file => {
+                const srcFile = path.join(src, file);
+                const destFile = path.join(dest, file);
+                copyFiles(srcFile, destFile);
+            });
+        } else {
+            // Skip TypeScript files and source maps as they are handled by tsc
+            if (!src.endsWith('.ts') && !src.endsWith('.map')) {
+                fs.copyFileSync(src, dest);
+                console.log(`Copied ${path.relative(frontendDir, src)} to ${path.relative(frontendDir, dest)}`);
+            }
         }
-        // Read the contents of the directory
-        fs.readdirSync(src).forEach(file => {
-            const srcFile = path.join(src, file);
-            const destFile = path.join(dest, file);
-            copyFiles(srcFile, destFile); // Recursively copy
-        });
-    } else {
-        // Copy the file
-        fs.copyFileSync(src, dest);
-        console.log(`Copied ${src} to ${dest}`);
+    } catch (error) {
+        console.error(`Error copying ${src} to ${dest}:`, error);
     }
 }
 
-// Copy contents from the public directory to the dist directory root
+// Copy contents from the public directory to the dist directory
+console.log('\nCopying public files...');
 if (fs.existsSync(publicDir)) {
-    fs.readdir(publicDir, (err, files) => {
-        if (err) {
-            console.error('Error reading public directory:', err);
-            return;
-        }
-
-        files.forEach(file => {
-            const publicFilePath = path.join(publicDir, file);
-            const destFilePath = path.join(distDir, file); // Copy directly to dist root
+    // Copy all directories except js
+    fs.readdirSync(publicDir).forEach(file => {
+        const publicFilePath = path.join(publicDir, file);
+        const destFilePath = path.join(distDir, file);
+        
+        // Skip the js directory as it's handled by TypeScript compilation
+        if (file !== 'js') {
             copyFiles(publicFilePath, destFilePath);
-        });
+        }
     });
+
+    // Copy client-side JavaScript files
+    const jsSrc = path.join(publicDir, 'js');
+    const jsDest = path.join(distDir, 'js');
+    if (fs.existsSync(jsSrc)) {
+        fs.readdirSync(jsSrc).forEach(file => {
+            if (file.endsWith('.js') && !file.endsWith('.test.js')) {
+                const srcFile = path.join(jsSrc, file);
+                const destFile = path.join(jsDest, file);
+                ensureDirectoryExists(jsDest);
+                fs.copyFileSync(srcFile, destFile);
+                console.log(`Copied ${path.relative(frontendDir, srcFile)} to ${path.relative(frontendDir, destFile)}`);
+            }
+        });
+    }
 } else {
     console.warn(`Public directory ${publicDir} does not exist.`);
 }
 
-// Copy images directory
-const imagesSrcDir = path.join(srcDir, 'images');
-const imagesDestDir = path.join(distDir, 'images');
-if (fs.existsSync(imagesSrcDir)) {
-    if (!fs.existsSync(imagesDestDir)) {
-        fs.mkdirSync(imagesDestDir, { recursive: true });
-    }
-    copyFiles(imagesSrcDir, imagesDestDir);
-} else {
-    console.warn(`Images directory ${imagesSrcDir} does not exist.`);
-}
+// Create a basic health check file
+const healthCheckContent = `{
+    "status": "ok",
+    "version": "${require('../package.json').version}",
+    "timestamp": "${new Date().toISOString()}"
+}`;
+fs.writeFileSync(path.join(distDir, 'health.json'), healthCheckContent);
 
-// Copy templates directory
-const templatesSrcDir = path.join(publicDir, 'templates');
-const templatesDestDir = path.join(distDir, 'templates');
-if (fs.existsSync(templatesSrcDir)) {
-    if (!fs.existsSync(templatesDestDir)) {
-        fs.mkdirSync(templatesDestDir, { recursive: true });
-    }
-    copyFiles(templatesSrcDir, templatesDestDir);
-} else {
-    console.warn(`Templates directory ${templatesSrcDir} does not exist.`);
-}
-
-// Copy data.json
-const dataSrcFile = path.join(srcDir, 'data.json');
-const dataDestFile = path.join(distDir, 'data.json');
-if (fs.existsSync(dataSrcFile)) {
-    fs.copyFileSync(dataSrcFile, dataDestFile);
-    console.log(`Copied data.json to ${dataDestFile}`);
-} else {
-    console.warn(`data.json ${dataSrcFile} does not exist.`);
-}
+console.log('\nBuild completed successfully!');

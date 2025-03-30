@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <title>Quote Generator</title>
+    <!-- Add jsPDF library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    <!-- Add our custom CSS -->
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <img 
+        id="companyLogo" 
+        alt="Company Logo" 
+        style="height: 150px;" 
+        src="images/company_logo.png"/>
+    <h1>Quote Generator</h1>
+    <form id="invoiceForm">
+        <div class="form-group">
+            <label for="customerName">Customer Name</label>
+            <input type="text" id="customerName" name="customerName" class="form-control" required autocomplete="name">
+        </div>
+
+        <div class="form-group">
+            <label for="address">Address</label>
+            <input type="text" id="address" name="address" class="form-control" required autocomplete="street-address">
+        </div>
+
+        <div class="form-group">
+            <label for="emailAddress">Email Address</label>
+            <input type="email" id="emailAddress" name="emailAddress" class="form-control" required autocomplete="email">
+        </div>
+
+        <div class="form-group">
+            <label for="phone">Phone Number</label>
+            <input type="tel" id="phone" name="phone" class="form-control" required autocomplete="tel">
+        </div>
+
+        <h3>Items:</h3>
+        <div class="form-group">
+            <label for="items">Items</label>
+            <div id="items" class="items-container">
+                <!-- Templates will be loaded here -->
+            </div>
+        </div>
+
+        <button type="button" id="addItemBtn" onclick="addItem()" disabled>Add Item</button>
+        <button type="submit" id="generateInvoiceBtn" disabled>Generate Invoice</button>
+    </form>
+
+    <!-- Add our custom JavaScript -->
+    <script src="/js/script.js"></script>
+</body>
+</html>

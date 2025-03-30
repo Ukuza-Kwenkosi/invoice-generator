@@ -15,11 +15,9 @@ function preloadLogo() {
     companyLogo.crossOrigin = "Anonymous"; // Handle cross-origin images if needed
     companyLogo.src = logoImg.src;
     companyLogo.onload = function() {
-        console.log("Logo loaded successfully");
         logoLoaded = true;
     };
     companyLogo.onerror = function() {
-        console.error("Error loading logo");
         logoLoaded = false;
     };
 }
@@ -42,10 +40,6 @@ function checkItemSelection() {
     
     document.getElementById('addItemBtn').disabled = !hasValidItem;
     document.getElementById('generateInvoiceBtn').disabled = !hasValidItem;
-    
-    console.log('Has valid item:', hasValidItem);
-    console.log('Add Item button disabled:', document.getElementById('addItemBtn').disabled);
-    console.log('Generate Invoice button disabled:', document.getElementById('generateInvoiceBtn').disabled);
 }
 
 // Update event listeners
@@ -112,9 +106,15 @@ class ItemSelectorComponent {
         const template = document.getElementById('itemSelectorTemplate');
         const content = template.content.cloneNode(true);
         
+        // Replace ${id} placeholder with actual ID
+        const id = this.id;
+        content.querySelectorAll('[id*="${id}"]').forEach(element => {
+            element.id = element.id.replace('${id}', id);
+        });
+        
         // Store references to elements
         this.dropdown = content.querySelector('.item-dropdown');
-        this.descriptionGroup = content.querySelector('#descriptionGroup');
+        this.descriptionGroup = content.querySelector('.description-group');
         this.description = content.querySelector('.item-description');
         this.sizeLabel = content.querySelector('.size-label');
         this.sizeDropdown = content.querySelector('.size-dropdown');
@@ -127,19 +127,11 @@ class ItemSelectorComponent {
     }
 
     setupEventListeners() {
-        // Get references to all elements we need
-        this.dropdown = this.element.querySelector('.item-dropdown');
-        this.sizeDropdown = this.element.querySelector('.size-dropdown');
-        this.optionDropdown = this.element.querySelector('.option-dropdown');
-        this.quantityInput = this.element.querySelector('input[type="number"]');
-        this.descriptionGroup = this.element.querySelector('.form-group');
-        this.descriptionSpan = this.descriptionGroup.querySelector('.item-description');
-        this.priceLabel = this.element.querySelector('#price');
-        this.sizeLabel = this.element.querySelector('.size-label');
-        this.optionLabel = this.element.querySelector('.option-label');
+        // We already have all the element references from the create() method
+        // No need to query them again from this.element
 
         if (!this.dropdown || !this.sizeDropdown || !this.optionDropdown || !this.quantityInput || 
-            !this.descriptionGroup || !this.descriptionSpan || !this.priceLabel || 
+            !this.descriptionGroup || !this.description || !this.priceLabel || 
             !this.sizeLabel || !this.optionLabel) {
             throw new Error('Required elements not found in container');
         }
@@ -154,19 +146,20 @@ class ItemSelectorComponent {
     handleItemSelection() {
         // Reset all fields
         this.descriptionGroup.style.display = 'none';
-        this.descriptionSpan.textContent = '';
+        this.description.textContent = '';
         this.priceLabel.style.display = 'none';
         this.priceLabel.textContent = 'Price: R0.00';
         this.sizeDropdown.innerHTML = '<option value="" disabled selected>Select size</option>';
         this.optionDropdown.innerHTML = '<option value="" disabled selected>Select option</option>';
-        this.quantityInput.style.display = 'none';
         this.quantityInput.value = '';
+        this.quantityInput.closest('.quantity-group').classList.add('hidden');
 
         // Hide controls initially
         this.sizeLabel.classList.add('hidden');
         this.sizeDropdown.classList.add('hidden');
         this.optionLabel.classList.add('hidden');
         this.optionDropdown.classList.add('hidden');
+        this.optionDropdown.disabled = true;
 
         if (this.dropdown.value) {
             const selectedOption = this.dropdown.options[this.dropdown.selectedIndex];
@@ -176,7 +169,7 @@ class ItemSelectorComponent {
             // Show description
             if (description && description !== 'undefined') {
                 this.descriptionGroup.style.display = 'block';
-                this.descriptionSpan.textContent = description;
+                this.description.textContent = description;
             }
 
             // Handle sizes and prices
@@ -210,23 +203,8 @@ class ItemSelectorComponent {
             } else {
                 this.priceLabel.textContent = `Price: R${itemData.price}`;
                 this.priceLabel.style.display = 'block';
-                this.quantityInput.style.display = 'block';
+                this.quantityInput.closest('.quantity-group').classList.remove('hidden');
                 this.quantityInput.setAttribute('required', '');
-            }
-
-            // Handle options
-            if (itemData.options && itemData.options.length > 0) {
-                this.optionLabel.classList.remove('hidden');
-                this.optionDropdown.classList.remove('hidden');
-                this.optionDropdown.disabled = false;
-                this.optionDropdown.innerHTML = '<option value="" disabled selected>Select option</option>';
-                
-                itemData.options.forEach(option => {
-                    const optionElement = document.createElement('option');
-                    optionElement.value = option;
-                    optionElement.textContent = option;
-                    this.optionDropdown.appendChild(optionElement);
-                });
             }
         }
 
@@ -239,8 +217,8 @@ class ItemSelectorComponent {
         this.optionLabel.classList.add('hidden');
         this.optionDropdown.classList.add('hidden');
         this.optionDropdown.disabled = true;
-        this.quantityInput.style.display = 'none';
         this.quantityInput.value = '';
+        this.quantityInput.closest('.quantity-group').classList.add('hidden');
 
         if (this.sizeDropdown.value) {
             const selectedSizeOption = this.sizeDropdown.options[this.sizeDropdown.selectedIndex];
@@ -263,13 +241,8 @@ class ItemSelectorComponent {
                     optionElement.textContent = option;
                     this.optionDropdown.appendChild(optionElement);
                 });
-
-                if (options.length === 1) {
-                    this.optionDropdown.value = options[0];
-                    this.handleOptionSelection();
-                }
             } else {
-                this.quantityInput.style.display = 'block';
+                this.quantityInput.closest('.quantity-group').classList.remove('hidden');
                 this.quantityInput.setAttribute('required', '');
             }
         }
@@ -278,16 +251,13 @@ class ItemSelectorComponent {
     }
 
     handleOptionSelection() {
-        const optionDropdown = this.optionDropdown;
-        const quantityInput = this.quantityInput;
-
-        if (optionDropdown.value) {
-            quantityInput.style.display = 'block';
-            quantityInput.setAttribute('required', '');
+        if (this.optionDropdown.value) {
+            this.quantityInput.closest('.quantity-group').classList.remove('hidden');
+            this.quantityInput.setAttribute('required', '');
         } else {
-            quantityInput.style.display = 'none';
-            quantityInput.removeAttribute('required');
-            quantityInput.value = '';
+            this.quantityInput.closest('.quantity-group').classList.add('hidden');
+            this.quantityInput.removeAttribute('required');
+            this.quantityInput.value = '';
         }
 
         checkItemSelection();

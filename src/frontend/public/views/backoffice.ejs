@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backoffice</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://unpkg.com/@heroicons/react@2.1.1/24/outline"></script>
+</head>
+<body class="min-h-screen bg-base-200">
+    <div class="navbar bg-base-100 shadow-lg">
+        <div class="flex-1">
+            <a class="btn btn-ghost text-xl">Backoffice</a>
+        </div>
+        <div class="flex-none">
+            <form action="/logout" method="POST">
+                <button class="btn btn-ghost" title="Logout">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="container mx-auto p-4">
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title">Product Management</h2>
+                <div class="overflow-x-auto">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Product Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% products.forEach(function(product) { %>
+                                <tr>
+                                    <td>
+                                        <div class="space-y-4">
+                                            <!-- Product Name as Header -->
+                                            <div class="border-b pb-2">
+                                                <h3 class="text-lg font-bold"><%= product.name %></h3>
+                                            </div>
+
+                                            <!-- Details Row -->
+                                            <div class="grid grid-cols-3 gap-4">
+                                                <!-- Sizes & Prices -->
+                                                <div>
+                                                    <h4 class="text-sm font-medium text-gray-500 mb-2">Sizes & Prices</h4>
+                                                    <% if (product.sizes && product.sizes.length > 0) { %>
+                                                        <div class="space-y-1">
+                                                            <% product.sizes.forEach(function(size) { %>
+                                                                <div class="flex items-center gap-2">
+                                                                    <span class="font-medium"><%= size.size %></span>
+                                                                    <span class="text-sm text-gray-500">R<%= size.price.toFixed(2) %></span>
+                                                                </div>
+                                                            <% }); %>
+                                                        </div>
+                                                    <% } else { %>
+                                                        <span class="text-gray-500">No sizes</span>
+                                                    <% } %>
+                                                </div>
+
+                                                <!-- Options -->
+                                                <div>
+                                                    <h4 class="text-sm font-medium text-gray-500 mb-2">Options</h4>
+                                                    <% if (product.options && product.options.length > 0) { %>
+                                                        <div class="flex flex-wrap gap-1">
+                                                            <% product.options.forEach(function(option) { %>
+                                                                <span class="badge badge-sm"><%= option %></span>
+                                                            <% }); %>
+                                                        </div>
+                                                    <% } else { %>
+                                                        <span class="text-gray-500">No options</span>
+                                                    <% } %>
+                                                </div>
+
+                                                <!-- Actions -->
+                                                <div>
+                                                    <h4 class="text-sm font-medium text-gray-500 mb-2">Actions</h4>
+                                                    <div class="flex gap-2">
+                                                        <button class="btn btn-sm btn-primary" onclick="editProduct('<%= product.name %>')" title="Edit">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                                                            </svg>
+                                                        </button>
+                                                        <button class="btn btn-sm btn-error" onclick="deleteProduct('<%= product.name %>')" title="Delete">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-actions justify-end mt-4">
+                    <button class="btn btn-primary" onclick="showAddProductModal()" title="Add New Product">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Product Modal -->
+    <dialog id="productModal" class="modal">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg" id="modalTitle">Add New Product</h3>
+            <form id="productForm" onsubmit="handleSubmit(event)">
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Name</span>
+                    </label>
+                    <input type="text" name="name" class="input input-bordered" required />
+                </div>
+                <div class="form-control">
+                    <div class="grid grid-cols-[1fr_120px_50px] gap-4">
+                        <div>
+                            <label class="label">
+                                <span class="label-text">Size</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="label">
+                                <span class="label-text">Price</span>
+                            </label>
+                        </div>
+                        <div></div>
+                    </div>
+                    <div id="sizesContainer" class="space-y-2">
+                        <!-- Sizes will be added here dynamically -->
+                    </div>
+                    <div class="flex justify-end mt-2">
+                        <button type="button" class="btn btn-primary" onclick="addSize()" title="Add Size">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Options (comma-separated)</span>
+                    </label>
+                    <input type="text" name="options" class="input input-bordered" />
+                </div>
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Description</span>
+                    </label>
+                    <textarea name="description" class="textarea textarea-bordered"></textarea>
+                </div>
+                <div class="modal-action">
+                    <button type="submit" class="btn btn-primary" title="Save">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </button>
+                    <button type="button" class="btn" onclick="closeModal()" title="Cancel">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </dialog>
+
+    <script>
+        function showAddProductModal() {
+            document.getElementById('modalTitle').textContent = 'Add New Product';
+            document.getElementById('productForm').reset();
+            document.getElementById('sizesContainer').innerHTML = '';
+            addSize(); // Add one empty size by default
+            document.getElementById('productModal').showModal();
+        }
+
+        function addSize() {
+            const container = document.getElementById('sizesContainer');
+            const sizeDiv = document.createElement('div');
+            sizeDiv.className = 'grid grid-cols-[1fr_120px_50px] gap-4 items-center';
+            sizeDiv.innerHTML = `
+                <div>
+                    <input type="text" name="sizes[][size]" class="input input-bordered w-full" required />
+                </div>
+                <div>
+                    <div class="relative">
+                        <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">R</span>
+                        <input type="text" name="sizes[][price]" class="input input-bordered pl-6 w-full" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" required />
+                    </div>
+                </div>
+                <button type="button" class="btn btn-error" title="Remove Size">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            `;
+            container.appendChild(sizeDiv);
+        }
+
+        async function editProduct(name) {
+            document.getElementById('modalTitle').textContent = 'Edit Product';
+            
+            try {
+                const response = await fetch('/data.json');
+                const products = await response.json();
+                const product = products.find(p => p.name === name);
+                
+                if (product) {
+                    const form = document.getElementById('productForm');
+                    form.querySelector('[name="name"]').value = product.name;
+                    form.querySelector('[name="options"]').value = product.options ? product.options.join(', ') : '';
+                    form.querySelector('[name="description"]').value = product.description || '';
+                    
+                    // Clear and populate sizes
+                    const sizesContainer = document.getElementById('sizesContainer');
+                    sizesContainer.innerHTML = '';
+                    
+                    if (product.sizes && product.sizes.length > 0) {
+                        product.sizes.forEach(size => {
+                            const sizeDiv = document.createElement('div');
+                            sizeDiv.className = 'grid grid-cols-[1fr_120px_50px] gap-4 items-center';
+                            sizeDiv.innerHTML = `
+                                <div>
+                                    <input type="text" name="sizes[][size]" class="input input-bordered w-full" value="${size.size}" required />
+                                </div>
+                                <div>
+                                    <div class="relative">
+                                        <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">R</span>
+                                        <input type="text" name="sizes[][price]" class="input input-bordered pl-6 w-full" value="${size.price.toFixed(2)}" inputmode="decimal" pattern="[0-9]*[.,]?[0-9]*" required />
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-error" title="Remove Size">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
+                            `;
+                            sizesContainer.appendChild(sizeDiv);
+                        });
+                    } else {
+                        addSize(); // Add one empty size if none exist
+                    }
+                    
+                    // Store the original name for update
+                    form.dataset.originalName = name;
+                }
+            } catch (error) {
+                console.error('Error fetching product data:', error);
+                alert('Error loading product data');
+            }
+            
+            document.getElementById('productModal').showModal();
+        }
+
+        function deleteProduct(name) {
+            if (confirm('Are you sure you want to delete this product?')) {
+                fetch(`/api/products/${encodeURIComponent(name)}`, {
+                    method: 'DELETE'
+                }).then(response => {
+                    if (response.ok) {
+                        window.location.reload();
+                    }
+                });
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('productModal').close();
+        }
+
+        async function handleSubmit(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            
+            // Get all size inputs
+            const sizeInputs = form.querySelectorAll('[name^="sizes["]');
+            const sizes = [];
+            for (let i = 0; i < sizeInputs.length; i += 2) {
+                const sizeInput = sizeInputs[i];
+                const priceInput = sizeInputs[i + 1];
+                if (sizeInput.value && priceInput.value) {
+                    // Convert price string to number, handling both comma and dot decimal separators
+                    const price = parseFloat(priceInput.value.replace(',', '.'));
+                    sizes.push({
+                        size: sizeInput.value,
+                        price: price
+                    });
+                }
+            }
+            
+            // Convert form data to a proper object
+            const data = {
+                name: formData.get('name'),
+                sizes,
+                options: formData.get('options') ? formData.get('options').split(',').map(opt => opt.trim()) : [],
+                description: formData.get('description')
+            };
+
+            try {
+                const originalName = form.dataset.originalName;
+                const url = originalName ? `/api/products/${encodeURIComponent(originalName)}` : '/api/products';
+                const method = originalName ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Error saving product');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error saving product');
+            }
+        }
+
+        // Add price input formatting
+        document.addEventListener('input', function(e) {
+            if (e.target.name && e.target.name.includes('sizes') && e.target.name.includes('price')) {
+                let value = e.target.value.replace(/[^0-9.,]/g, '');
+                
+                // Handle decimal separator
+                if (value.includes(',')) {
+                    value = value.replace('.', '');
+                } else if (value.includes('.')) {
+                    value = value.replace(',', '');
+                }
+                
+                // Ensure only one decimal separator
+                const parts = value.split(/[.,]/);
+                if (parts.length > 2) {
+                    value = parts[0] + '.' + parts.slice(1).join('');
+                }
+                
+                // Format to 2 decimal places if there's a decimal part
+                if (value.includes('.')) {
+                    const [whole, decimal] = value.split('.');
+                    value = whole + '.' + decimal.slice(0, 2);
+                }
+                
+                e.target.value = value;
+            }
+        });
+    </script>
+</body>
+</html>
