@@ -20,13 +20,17 @@
   },
   {
     "name": "Classic Magnetic Steel",
-    "size": "1.14m h x 2.4m",
+    "sizes": [
+      {
+        "size": "1.14m h x 2.4m",
+        "price": 4735
+      }
+    ],
     "options": [
       "Chalk",
       "White"
     ],
-    "description": "Steel writing board c/w aluminium chalkrail",
-    "price": 4735
+    "description": "Steel writing board c/w aluminium chalkrail"
   },
   {
     "name": "Classic Magnetic Steel - Folding",
@@ -48,30 +52,52 @@
   },
   {
     "name": "Premium Magnetic",
-    "size": "1.2m h x 2.4m",
+    "sizes": [
+      {
+        "size": "1.2m h x 2.4m",
+        "price": 4039
+      }
+    ],
     "options": [
       "Chalk",
       "White"
     ],
-    "description": "Steel writing board with Aluminium frame & Pentray",
-    "price": 4039
+    "description": "Steel writing board with Aluminium frame & Pentray"
   },
   {
     "name": "Pinboard Fittings",
-    "size": "2.4m+",
-    "price": 65
+    "sizes": [
+      {
+        "size": "2.4m+",
+        "price": 65
+      }
+    ]
   },
   {
     "name": "Classic writing board fittings",
-    "size": "2.4m+",
-    "price": 95
+    "sizes": [
+      {
+        "size": "2.4m+",
+        "price": 95
+      }
+    ]
   },
   {
     "name": "Crating",
-    "price": 1500
+    "sizes": [
+      {
+        "size": "Standard",
+        "price": 1500
+      }
+    ]
   },
   {
     "name": "Fittings",
-    "price": 65
+    "sizes": [
+      {
+        "size": "Standard",
+        "price": 65
+      }
+    ]
   }
 ]

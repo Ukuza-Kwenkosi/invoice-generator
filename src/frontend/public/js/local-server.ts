@@ -4,6 +4,47 @@ import fs from 'fs';
 import session from 'express-session';
 import bodyParser from 'body-parser';
 import flash from 'connect-flash';
+import { fileURLToPath } from 'url';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+
+// Get current directory in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Add type definition for jsPDF with autoTable
+interface TableStyles {
+    fillColor?: number[];
+    textColor?: number[];
+    fontSize?: number;
+    fontStyle?: string;
+    cellPadding?: number;
+    halign?: 'left' | 'center' | 'right';
+    cellWidth?: number | 'auto';
+}
+
+interface AutoTableOptions {
+    startY?: number;
+    head?: any[][];
+    body?: any[][];
+    foot?: any[][];
+    theme?: string;
+    headStyles?: TableStyles;
+    bodyStyles?: TableStyles;
+    alternateRowStyles?: TableStyles;
+    footStyles?: TableStyles;
+    margin?: { top: number; left?: number; right?: number };
+    tableWidth?: string;
+    columnStyles?: Record<number, TableStyles>;
+    styles?: TableStyles;
+}
+
+interface JsPDFWithAutoTable extends jsPDF {
+    autoTable: (options: AutoTableOptions) => void;
+    lastAutoTable: {
+        finalY: number;
+    };
+}
 
 // Product interface
 interface Product {
@@ -24,7 +65,7 @@ declare module 'express-session' {
 }
 
 export const app = express();
-const port = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Data file paths
 const getDataPaths = () => {
@@ -36,8 +77,8 @@ const getDataPaths = () => {
         };
     }
     return {
-        dataDir: path.join(__dirname, '../data'),
-        dataPath: path.join(__dirname, '../data/data.json')
+        dataDir: path.join(__dirname, '..'),
+        dataPath: path.join(__dirname, '..', 'data.json')
     };
 };
 
@@ -60,36 +101,34 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
 });
 
 // Middleware
-app.use(express.static(path.join(__dirname, '..'), {
-    setHeaders: (res: Response, filePath: string) => {
-        if (filePath.endsWith('.css')) {
-            res.setHeader('Content-Type', 'text/css');
-        } else if (filePath.endsWith('.js')) {
-            res.setHeader('Content-Type', 'application/javascript');
-        } else if (filePath.endsWith('.html')) {
-            res.setHeader('Content-Type', 'text/html');
-        }
-    }
-}));
-
-// Serve js files
-app.use('/js', express.static(path.join(__dirname, '.'), {
-    setHeaders: (res: Response, _filePath: string) => {
-        res.setHeader('Content-Type', 'application/javascript');
-    }
-}));
-
-// Serve templates directory
-app.use('/templates', express.static(path.join(__dirname, '../templates'), {
-    setHeaders: (res: Response, filePath: string) => {
-        if (filePath.endsWith('.html')) {
-            res.setHeader('Content-Type', 'text/html');
-        }
-    }
-}));
-
-app.use(express.json());
+app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Data endpoint - serve data.json directly (MUST be before static file serving)
+app.get('/data.json', (req: Request, res: Response) => {
+    try {
+        const dataPath = path.join(__dirname, '../data/data.json');
+        if (!fs.existsSync(dataPath)) {
+            console.error('Data file not found at:', dataPath);
+            return res.status(404).json({ error: 'Data file not found' });
+        }
+        const data = fs.readFileSync(dataPath, 'utf8');
+        res.setHeader('Content-Type', 'application/json');
+        res.send(data);
+    } catch (error) {
+        console.error('Error serving data.json:', error);
+        res.status(500).json({ error: 'Error reading data file' });
+    }
+});
+
+// Serve static files
+app.use('/css', express.static(path.join(__dirname, '../css')));
+app.use('/js', express.static(path.join(__dirname)));
+app.use('/images', express.static(path.join(__dirname, '../images')));
+app.use('/views', express.static(path.join(__dirname, '../views')));
+
 app.use(session({
     secret: 'your-secret-key',
     resave: false,
@@ -129,13 +168,13 @@ app.post('/login', (req: Request, res: Response): void => {
     }
 });
 
-// Logout handler
+// Logout route
 app.post('/logout', (req: Request, res: Response) => {
-    req.session.destroy((err) => {
+    req.session.destroy((err: Error | null) => {
         if (err) {
             console.error('Error destroying session:', err);
         }
-        res.redirect('/login');
+        res.redirect('/');
     });
 });
 
@@ -159,7 +198,7 @@ const readDataFile = (): Product[] => {
             return [];
         }
     } catch (error) {
-        if (error.code === 'EACCES') {
+        if (error instanceof Error && 'code' in error && error.code === 'EACCES') {
             throw new Error('Permission denied');
         }
         return [];
@@ -177,7 +216,7 @@ const writeDataFile = (data: Product[]): boolean => {
         return true;
     } catch (error) {
         console.error('Error writing data file:', error);
-        if (error.code === 'EACCES') {
+        if (error instanceof Error && 'code' in error && error.code === 'EACCES') {
             throw new Error('Permission denied');
         }
         return false;
@@ -187,11 +226,6 @@ const writeDataFile = (data: Product[]): boolean => {
 // Serve the index.ejs as HTML
 app.get('/', (_req: Request, res: Response) => {
     try {
-        console.log('Views directory:', app.get('views'));
-        console.log('Current directory:', __dirname);
-        console.log('Views path:', path.join(__dirname, '../views'));
-        console.log('Views directory exists:', fs.existsSync(path.join(__dirname, '../views')));
-        console.log('Views directory contents:', fs.readdirSync(path.join(__dirname, '../views')));
         res.render('index', { error: null });
     } catch (error) {
         console.error('Error rendering index:', error);
@@ -203,23 +237,184 @@ app.get('/', (_req: Request, res: Response) => {
     }
 });
 
-// Error handling middleware
-app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-    console.error('Unhandled error:', err);
-    res.status(500).render('error', { 
-        error: 'Internal Server Error',
-        message: err.message || 'An unexpected error occurred'
-    });
+// Add interface for invoice item
+interface InvoiceItem {
+    name: string;
+    size?: string;
+    option?: string;
+    quantity: number;
+    price: number;
+    description?: string;
+}
+
+// Generate invoice endpoint
+app.post('/generate-invoice', (req, res) => {
+    try {
+        // Validate incoming request data
+        if (!req.body || !req.body.items || !Array.isArray(req.body.items) || req.body.items.length === 0) {
+            return res.status(400).json({ error: 'Invalid request data: items array is required' });
+        }
+
+        // Create new PDF document
+        const doc = new jsPDF() as JsPDFWithAutoTable;
+        
+        const leftMargin = 25;  
+        const topMargin = 25;   
+        const rightMargin = 185;
+        
+        // Add company logo if it exists
+        try {
+            const logoPath = path.join(__dirname, '../images/company_logo.png');
+            if (fs.existsSync(logoPath)) {
+                const logo = fs.readFileSync(logoPath);
+                doc.addImage(logo, 'PNG', leftMargin - 10, topMargin, 72, 52);
+            }
+        } catch (error) {
+            // Log error but continue without logo
+        }
+
+        // Add company details
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Ukuza Kwenkosi Enterprises trading as Ukuza Kivenkosi Enterprises', rightMargin, topMargin + 15, { align: 'right' });
+        doc.text('Reg No 2012/750142/07 TAX No. 9278518254', rightMargin, topMargin + 20, { align: 'right' });
+        doc.text('E2144 Osizeni, Newcastle, KiaZulu-Natal, 2952', rightMargin, topMargin + 25, { align: 'right' });
+
+        // Add customer details
+        let customerInfoTopMargin = 55;
+        doc.setFontSize(10);
+        const quoteNo = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        doc.text(`Quote #: ${quoteNo}`, rightMargin, topMargin + customerInfoTopMargin, { align: 'right' });
+        doc.text(`Date: ${new Date().toLocaleDateString()}`, rightMargin, topMargin + customerInfoTopMargin + 5, { align: 'right' });
+        
+        doc.text(`Name: ${req.body.customerDetails.name}`, leftMargin, topMargin + customerInfoTopMargin);
+        doc.text(`Address: ${req.body.customerDetails.address || ''}`, leftMargin, topMargin + customerInfoTopMargin + 5);
+        doc.text(`Email: ${req.body.customerDetails.email}`, leftMargin, topMargin + customerInfoTopMargin + 10);
+        doc.text(`Phone: ${req.body.customerDetails.phone}`, leftMargin, topMargin + customerInfoTopMargin + 15);
+
+        // Prepare table data
+        const tableColumn = ["Description", "Price", "QTY", "Total"];
+        const tableRows: string[][] = [];
+        let totalAmount = 0;
+        
+        req.body.items.forEach((item: InvoiceItem) => {
+            console.log('Processing item:', item); // Debug log
+            const VAT = 1.15;
+            const total = item.price * item.quantity * VAT;
+            const price = item.price * VAT;
+            totalAmount += total;
+            
+            const description = `${item.name}${item.description ? ` - ${item.description}` : ''}${item.size ? ` - ${item.size}` : ''}${item.option ? ` - ${item.option}` : ''}`;
+            console.log('Generated description:', description); // Debug log
+            
+            // Format price with thousand separators and fixed decimal places
+            const formattedPrice = `R ${price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+            const formattedTotal = `R ${total.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+            
+            tableRows.push([
+                description,
+                formattedPrice,
+                item.quantity.toString(),
+                formattedTotal
+            ]);
+        });
+
+        // Generate table
+        doc.autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            startY: topMargin + 80,
+            margin: { top: 0, left: leftMargin, right: leftMargin },
+            theme: 'grid',
+            headStyles: {
+                fillColor: [255, 99, 71],
+                textColor: [255, 255, 255],
+                halign: 'center',
+                fontSize: 10,
+                cellPadding: 2
+            },
+            alternateRowStyles: {
+                fillColor: [245, 245, 245]
+            },
+            foot: [['', '', 
+                { content: 'Total', styles: { halign: 'center', fontSize: 10, cellPadding: 2 } }, 
+                { content: `R ${totalAmount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`, styles: { halign: 'center', fontSize: 10, cellPadding: 2 } }
+            ]],
+            footStyles: {
+                fillColor: [255, 99, 71],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                fontSize: 10,
+                cellPadding: 2
+            },
+            columnStyles: {
+                0: { cellWidth: 'auto', cellPadding: 2 },  // Description column remains flexible
+                1: { cellWidth: 25, halign: 'center', cellPadding: 4 },  // Price column reduced
+                2: { cellWidth: 12, halign: 'center', cellPadding: 4 },  // Quantity column reduced
+                3: { cellWidth: 30, halign: 'center', cellPadding: 4 }   // Total column reduced
+            },
+            styles: {
+                fontSize: 10,
+                cellPadding: 2
+            }
+        });
+
+        const finalY = (doc as any).lastAutoTable.finalY || (topMargin + 115);
+
+        // Add bank details
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Banking Details', leftMargin, finalY + 37);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Bank:', leftMargin, finalY + 44);
+        doc.text('Account Holder:', leftMargin, finalY + 51);
+        doc.text('Account No:', leftMargin, finalY + 58);
+        doc.text('Branch Code:', leftMargin, finalY + 65);
+        doc.text('Swift code:', leftMargin, finalY + 72);
+        
+        // Add values in bold
+        doc.setFont('helvetica', 'bold');
+        doc.text('Capitec', leftMargin + 40, finalY + 44);
+        doc.text('Ukuza Kwenkosi', leftMargin + 40, finalY + 51);
+        doc.text('1052338658', leftMargin + 40, finalY + 58);
+        doc.text('450105', leftMargin + 40, finalY + 65);
+        doc.text('CABLZAJJ', leftMargin + 40, finalY + 72);
+
+        // Add terms and conditions
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Terms & Conditions:', leftMargin, finalY + 120);
+        doc.setFont('helvetica', 'normal');
+        doc.text('1. This quote is valid for 30 days from the date of issue.', leftMargin, finalY + 130);
+        doc.text('2. Payment terms: 50% deposit required to confirm order.', leftMargin, finalY + 137);
+        doc.text('3. Delivery time: 2-3 weeks after confirmation of order.', leftMargin, finalY + 144);
+
+        // Set response headers
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=invoice-${quoteNo}.pdf`);
+
+        // Send the PDF
+        const pdfBuffer = doc.output('arraybuffer');
+        res.send(Buffer.from(pdfBuffer));
+    } catch (error) {
+        console.error('Error generating invoice:', error);
+        res.status(500).json({ error: 'Error generating invoice' });
+    }
 });
 
-// Data endpoint
-app.get('/data.json', (_req: Request, res: Response) => {
-    try {
-        const data = readDataFile();
-        res.json(data);
-    } catch (error) {
-        console.error('Error reading data:', error);
-        res.status(500).json({ success: false, error: 'Internal server error' });
+// Handle 404 errors
+app.use((req: Request, res: Response) => {
+    res.status(404).send('404 - Page Not Found');
+});
+
+// Error handling middleware
+app.use((err: Error & { code?: string }, req: Request, res: Response, next: NextFunction) => {
+    console.error('Error:', err);
+    
+    if (err.code === 'EACCES') {
+        res.status(500).send('Permission denied. Please check file permissions.');
+    } else {
+        res.status(500).send('An error occurred. Please try again later.');
     }
 });
 
@@ -341,9 +536,13 @@ app.delete('/api/products/:name?', isAuthenticated, (req: Request, res: Response
     }
 });
 
-// Only start the server if this file is run directly
-if (require.main === module) {
-    app.listen(port, () => {
-        console.log(`Server is running at http://localhost:${port}`);
-    });
-} 
+// Start server
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+}).on('error', (err: Error & { code?: string }) => {
+    if (err.code === 'EACCES') {
+        console.error(`Port ${PORT} requires elevated privileges`);
+    } else {
+        console.error('Error starting server:', err);
+    }
+});
