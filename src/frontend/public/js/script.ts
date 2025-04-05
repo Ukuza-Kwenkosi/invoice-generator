@@ -1,9 +1,12 @@
-import { ItemData } from './models/types';
+import { ItemData } from './models/types.js';
 import { ItemSelectorComponent } from './components/item-selector.js';
+import { apiService } from './services/api.js';
+import { InvoiceData } from './models/types.js';
 
 // Global variables
 let itemCount: number = 1;
 let companyLogo: HTMLImageElement = new Image();
+let products: any[] = []; // Store products globally
 
 // Global variables to store logo colors - using brand colors common in South African businesses
 // @ts-ignore - Will be used in PDF generation
@@ -34,181 +37,222 @@ declare global {
     }
 }
 
+async function loadProducts(): Promise<void> {
+    try {
+        products = await apiService.getProducts();
+        if (!Array.isArray(products)) {
+            console.error('Failed to load products: Invalid response format');
+            products = [];
+        }
+    } catch (error) {
+        console.error('Error loading products:', error);
+        products = [];
+    }
+}
+
 function loadDropDown(): void {
     const container = document.getElementById('itemsContainer');
     if (!container) return;
 
-    const itemSelector = new ItemSelectorComponent(`item${itemCount}`);
+    const itemSelector = new ItemSelectorComponent(`item${itemCount}`, products);
     container.appendChild(itemSelector.getElement());
     itemCount++;
 }
 
-// Initialize the page
-document.addEventListener('DOMContentLoaded', () => {
+// Add toast notification function at the top
+function showToast(message: string, type: 'success' | 'error' = 'error'): void {
+    const toast = document.createElement('div');
+    toast.className = `fixed bottom-4 right-4 p-4 rounded-lg shadow-lg text-white transition-opacity duration-300 ${
+        type === 'success' ? 'bg-success' : 'bg-error'
+    }`;
+    toast.style.zIndex = '1000';
+    toast.textContent = message;
+
+    document.body.appendChild(toast);
+
+    // Fade out and remove after 3 seconds
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', async () => {
+    // Initialize UI components
     preloadLogo();
+    initializeEventListeners();
+    
+    // Load products first
+    await loadProducts();
+    
+    // Then load initial item
     loadDropDown();
     
-    // Make loadDropDown available globally
-    window.loadDropDown = loadDropDown;
-
-    // Add event listeners
-    document.getElementById('addItemBtn')?.addEventListener('click', () => {
-        const container = document.getElementById('itemsContainer');
-        if (container) {
-            const newComponent = new ItemSelectorComponent(`item-${container.children.length + 1}`);
-            container.appendChild(newComponent.getElement());
-        }
-    });
-
-    // Handle form submission
-    const quoteForm = document.getElementById('invoiceForm') as HTMLFormElement;
-    console.log('Form element:', quoteForm); // Debug log
-    
-    if (quoteForm) {
-        quoteForm.addEventListener('submit', async (e) => {
-            console.log('Form submitted!'); // Debug log
-            e.preventDefault(); // Prevent default form submission
+    // Add event listeners for form submission
+    const form = document.getElementById('invoiceForm') as HTMLFormElement;
+    if (form) {
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Show loading spinner
+            const loadingSpinner = document.createElement('div');
+            loadingSpinner.className = 'loading-spinner';
+            loadingSpinner.innerHTML = `
+                <div class="spinner-overlay">
+                    <div class="spinner"></div>
+                    <p>Generating Invoice...</p>
+                </div>
+            `;
+            document.body.appendChild(loadingSpinner);
             
             try {
-                console.log('Starting invoice generation...'); // Debug log
-                // Show loading spinner
-                const spinner = document.createElement('div');
-                spinner.className = 'loading-spinner';
-                spinner.innerHTML = `
-                    <div class="spinner-overlay">
-                        <div class="spinner"></div>
-                        <p>Generating invoice...</p>
-                    </div>
-                `;
-                document.body.appendChild(spinner);
+                // Collect form data
+                const formData = new FormData(form);
+                
+                // Validate customer details
+                const customerName = formData.get('customerName')?.toString() || '';
+                const customerAddress = formData.get('customerAddress')?.toString() || '';
+                const customerEmail = formData.get('customerEmail')?.toString() || '';
+                const customerPhone = formData.get('customerPhone')?.toString() || '';
 
-                // Get all item components
-                const itemsContainer = document.getElementById('itemsContainer');
-                if (!itemsContainer) {
-                    console.error('Items container not found!'); // Debug log
-                    return;
+                // Check if any customer detail is missing
+                if (!customerName || !customerAddress || !customerEmail || !customerPhone) {
+                    throw new Error('Please fill in all customer details');
                 }
 
-                console.log('Collecting items...');
-                const items = Array.from(itemsContainer.children).map(item => {
-                    const dropdown = item.querySelector('select[id^="item-dropdown-"]') as HTMLSelectElement;
-                    const sizeDropdown = item.querySelector('select[id^="size-dropdown-"]') as HTMLSelectElement;
-                    const optionDropdown = item.querySelector('select[id^="option-dropdown-"]') as HTMLSelectElement;
-                    const quantityInput = item.querySelector('input[id^="quantity-"]') as HTMLInputElement;
-
-                    if (!dropdown || !quantityInput) {
-                        console.log('Missing required fields:', { dropdown, quantityInput }); // Debug log
-                        return null;
-                    }
-
-                    const selectedOption = dropdown.options[dropdown.selectedIndex];
-                    const itemData = JSON.parse(selectedOption.dataset.itemData || '{}');
-                    console.log('Selected item data:', itemData); // Debug log
-
-                    // Extract price based on the item type
-                    let price: number;
-                    if (itemData.size && itemData.price) {
-                        // Item has fixed size and price
-                        price = itemData.price;
-                    } else if (sizeDropdown && sizeDropdown.value) {
-                        // Item has multiple sizes
-                        const selectedSizeOption = sizeDropdown.options[sizeDropdown.selectedIndex];
-                        const sizeData = itemData.sizes?.find((s: any) => s.size === sizeDropdown.value);
-                        price = sizeData?.price || 0;
-                    } else {
-                        console.error('Could not determine price for item:', itemData);
-                        return null;
-                    }
-
-                    const itemToSend = {
-                        name: dropdown.value,
-                        description: itemData.description || '',
-                        size: sizeDropdown?.value || itemData.size,
-                        option: optionDropdown?.value,
-                        quantity: parseInt(quantityInput.value),
-                        price: price
+                // Get all items and validate them
+                const items = Array.from(document.querySelectorAll('.invoice-item')).map(item => {
+                    const productSelect = item.querySelector('.product-select') as HTMLSelectElement;
+                    const selectedProduct = products.find(p => p.name === productSelect.value);
+                    return {
+                        name: productSelect.value,
+                        size: (item.querySelector('.size-select') as HTMLSelectElement).value,
+                        option: (item.querySelector('.option-select') as HTMLSelectElement).value || undefined,
+                        quantity: parseInt((item.querySelector('.quantity-input') as HTMLInputElement).value) || 0,
+                        price: parseFloat((item.querySelector('.price-input') as HTMLInputElement).value) || 0,
+                        description: selectedProduct?.description || undefined
                     };
-                    console.log('Item to send:', itemToSend); // Debug log
-                    return itemToSend;
-                }).filter(Boolean);
-
-                console.log('Collected items:', items); // Debug log
-
-                // Get customer details
-                const customerDetails = {
-                    name: (document.getElementById('customerName') as HTMLInputElement).value,
-                    email: (document.getElementById('customerEmail') as HTMLInputElement).value,
-                    phone: (document.getElementById('customerPhone') as HTMLInputElement).value,
-                    address: (document.getElementById('customerAddress') as HTMLTextAreaElement).value
-                };
-
-                console.log('Customer details:', customerDetails); // Debug log
-
-                // Send data to server
-                console.log('Sending data to server...'); // Debug log
-                const response = await fetch('/generate-invoice', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        customerDetails,
-                        items
-                    })
                 });
 
-                console.log('Server response:', response); // Debug log
-
-                if (!response.ok) {
-                    throw new Error('Failed to generate invoice');
+                // Validate items
+                if (items.length === 0) {
+                    throw new Error('Please add at least one item to the invoice');
                 }
 
-                // Get the PDF blob
-                const blob = await response.blob();
-                console.log('Received PDF blob:', blob); // Debug log
+                // Check if any item is invalid
+                const invalidItem = items.find(item => !item.name || !item.size || item.quantity <= 0 || item.price <= 0);
+                if (invalidItem) {
+                    throw new Error('Please ensure all items have a product selected, size selected, quantity greater than 0, and valid price');
+                }
+
+                const invoiceData: InvoiceData = {
+                    customerName,
+                    customerAddress,
+                    customerEmail,
+                    customerPhone,
+                    date: new Date().toISOString().split('T')[0],
+                    invoiceNumber: Date.now().toString(), // Generate a timestamp-based invoice number
+                    items
+                };
+
+                // Generate PDF
+                const pdfBlob = await apiService.createInvoice(invoiceData);
                 
-                // Create URL for the blob
-                const url = window.URL.createObjectURL(blob);
+                // Create a URL for the PDF blob
+                const pdfUrl = URL.createObjectURL(pdfBlob);
                 
                 // Open PDF in new tab
-                const pdfWindow = window.open(url, '_blank');
-                if (!pdfWindow) {
-                    throw new Error('Failed to open PDF in new tab');
-                }
-
-                // Wait for the PDF to load before resetting the form
-                setTimeout(() => {
-                    // Remove spinner
-                    const spinner = document.querySelector('.loading-spinner');
-                    if (spinner) {
-                        document.body.removeChild(spinner);
-                    }
-
-                    // Reset form
-                    quoteForm.reset();
+                window.open(pdfUrl, '_blank');
+                
+                // Reset form
+                form.reset();
+                
+                // Remove all items except the first one
+                const itemsContainer = document.getElementById('itemsContainer');
+                if (itemsContainer) {
+                    const items = Array.from(itemsContainer.children);
+                    items.slice(1).forEach(item => item.remove());
                     
-                    // Clear items container and add a new empty item selector
-                    if (itemsContainer) {
-                        itemsContainer.innerHTML = '';
-                        const newComponent = new ItemSelectorComponent('item-1');
-                        itemsContainer.appendChild(newComponent.getElement());
+                    // Reset the first item's selections
+                    const firstItem = items[0];
+                    if (firstItem) {
+                        const productSelect = firstItem.querySelector('.product-select') as HTMLSelectElement;
+                        if (productSelect) {
+                            productSelect.value = '';
+                            // Trigger change event to reset dependent fields
+                            productSelect.dispatchEvent(new Event('change'));
+                        }
                     }
-
-                    // Reset item count
-                    itemCount = 1;
-                }, 1000); // Wait 1 second before resetting
-
+                }
+                
+                // Reset item counter
+                itemCount = 1;
+                
             } catch (error) {
                 console.error('Error generating invoice:', error);
-                alert('Error generating invoice. Please try again.');
-                // Remove spinner in case of error
-                const spinner = document.querySelector('.loading-spinner');
-                if (spinner) {
-                    document.body.removeChild(spinner);
-                }
+                const errorMessage = error instanceof Error ? error.message : 'An error occurred while generating the invoice';
+                const errorDetails = (error as any)?.details?.details || '';
+                showToast(`${errorMessage}${errorDetails ? `. ${errorDetails}` : ''}`);
+            } finally {
+                // Remove loading spinner
+                loadingSpinner.remove();
             }
         });
-    } else {
-        console.error('Quote form not found!'); // Debug log
     }
-}); 
+});
+
+function initializeEventListeners() {
+    // Add event listener for Add Item button
+    const addItemBtn = document.getElementById('addItemBtn');
+    if (addItemBtn) {
+        addItemBtn.addEventListener('click', loadDropDown);
+    }
+
+    // Add your event listeners here
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLogin);
+    }
+
+    const logoutButton = document.getElementById('logoutButton');
+    if (logoutButton) {
+        logoutButton.addEventListener('click', handleLogout);
+    }
+}
+
+async function handleLogin(event: Event) {
+    event.preventDefault();
+    const form = event.target as HTMLFormElement;
+    const formData = new FormData(form);
+    const credentials = {
+        username: formData.get('username') as string,
+        password: formData.get('password') as string
+    };
+
+    try {
+        const response = await apiService.login(credentials);
+        if (response.success) {
+            window.location.href = '/dashboard.html';
+        } else {
+            showToast(response.error || 'Login failed');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        showToast('An error occurred during login');
+    }
+}
+
+async function handleLogout() {
+    try {
+        const response = await apiService.logout();
+        if (response.success) {
+            window.location.href = '/login.html';
+        } else {
+            showToast(response.error || 'Logout failed');
+        }
+    } catch (error) {
+        console.error('Logout error:', error);
+        showToast('An error occurred during logout');
+    }
+} 

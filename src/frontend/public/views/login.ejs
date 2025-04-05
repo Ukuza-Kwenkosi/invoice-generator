@@ -15,7 +15,7 @@
             </div>
             <div class="card flex-shrink-0 w-full max-w-sm shadow-2xl bg-base-100">
                 <form class="card-body" action="/login" method="POST">
-                    <% if (messages.error) { %>
+                    <% if (typeof messages !== 'undefined' && messages && messages.error) { %>
                         <div class="alert alert-error">
                             <span><%= messages.error %></span>
                         </div>

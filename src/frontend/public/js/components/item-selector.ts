@@ -1,283 +1,267 @@
-import { ItemData } from '../models/types';
+import { apiService } from '../services/api.js';
+
+interface ProductSize {
+    size: string;
+    price: number;
+}
+
+interface Product {
+    name: string;
+    sizes: ProductSize[];
+    options?: string[];
+    description?: string;
+}
 
 export class ItemSelectorComponent {
+    private element: HTMLDivElement;
     private id: string;
-    private element: HTMLElement;
-    private dropdown: HTMLSelectElement;
-    private descriptionGroup: HTMLElement;
-    private description: HTMLElement;
-    private sizeLabel: HTMLElement;
-    private sizeDropdown: HTMLSelectElement;
-    private optionLabel: HTMLElement;
-    private optionDropdown: HTMLSelectElement;
-    private quantityInput: HTMLInputElement;
-    private priceLabel: HTMLElement;
+    private products: Product[] = [];
 
-    constructor(id: string) {
+    constructor(id: string, products: Product[]) {
         this.id = id;
-        const template = document.getElementById('itemSelectorTemplate') as HTMLTemplateElement;
-        if (!template) {
-            throw new Error('Item selector template not found');
-        }
-        
-        // Clone the template content
-        const content = template.content.cloneNode(true) as DocumentFragment;
-        this.element = content.querySelector('.item') as HTMLElement;
-        
-        // Replace all instances of PLACEHOLDER with the actual ID
-        const html = this.element.innerHTML.replace(/PLACEHOLDER/g, id);
-        this.element.innerHTML = html;
-        
-        // Get references to elements
-        this.dropdown = this.element.querySelector(`#item-dropdown-${id}`) as HTMLSelectElement;
-        this.descriptionGroup = this.element.querySelector('.description-group') as HTMLElement;
-        this.description = this.element.querySelector('.item-description') as HTMLElement;
-        this.sizeLabel = this.element.querySelector('.size-label') as HTMLElement;
-        this.sizeDropdown = this.element.querySelector(`#size-dropdown-${id}`) as HTMLSelectElement;
-        this.optionLabel = this.element.querySelector('.option-label') as HTMLElement;
-        this.optionDropdown = this.element.querySelector(`#option-dropdown-${id}`) as HTMLSelectElement;
-        this.quantityInput = this.element.querySelector(`#quantity-${id}`) as HTMLInputElement;
-        this.priceLabel = this.element.querySelector('#price') as HTMLElement;
-        
-        // Initially hide all controls except the item dropdown
-        this.hideAllControls();
-        
-        this.setupEventListeners();
-        this.loadData();
+        this.products = products;
+        this.element = document.createElement('div');
+        this.element.className = 'invoice-item';
+        this.element.id = id;
+        this.initializeComponent();
     }
 
-    private hideAllControls(): void {
-        this.descriptionGroup.style.display = 'none';
-        this.sizeLabel.closest('.form-group')?.classList.add('hidden');
-        this.optionLabel.closest('.form-group')?.classList.add('hidden');
-        this.quantityInput.closest('.form-group')?.classList.add('hidden');
-        this.priceLabel.style.display = 'none';
+    private async initializeComponent() {
+        // Create the HTML structure
+        this.element.innerHTML = `
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="${this.id}-product">Product</label>
+                    <select class="form-control product-select" id="${this.id}-product" required>
+                        <option value="">Select a product</option>
+                    </select>
+                    <div class="form-group description-group" style="display: none; margin-top: 10px;">
+                        <label class="description-label">Description</label>
+                        <div class="form-control product-description" style="
+                            padding: 8px 12px;
+                            background-color: #f8f9fa;
+                            border-radius: 4px;
+                            border: 1px solid #dee2e6;
+                            font-size: 0.9em;
+                            color: #495057;
+                            height: 38px;
+                            display: flex;
+                            align-items: center;
+                            line-height: 1.5;
+                        "></div>
+                    </div>
+                </div>
+                <div class="form-group col-md-6 size-group" style="display: none;">
+                    <label for="${this.id}-size">Size</label>
+                    <select class="form-control size-select" id="${this.id}-size" required>
+                        <option value="">Select a size</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-6 option-group" style="display: none;">
+                    <label for="${this.id}-option">Option</label>
+                    <select class="form-control option-select" id="${this.id}-option" required>
+                        <option value="">Select an option</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group col-md-3 quantity-group" style="display: none;">
+                    <label for="${this.id}-quantity">Quantity</label>
+                    <input type="number" class="form-control quantity-input" id="${this.id}-quantity" value="1" min="1" required>
+                </div>
+                <div class="form-group col-md-3 price-group" style="display: none;">
+                    <label for="${this.id}-price">Price</label>
+                    <input type="number" class="form-control price-input" id="${this.id}-price" value="0.00" readonly>
+                </div>
+            </div>
+        `;
+
+        // Initialize products in dropdown
+        this.initializeProducts();
+
+        // Add event listeners
+        this.addEventListeners();
     }
 
-    async loadData(): Promise<void> {
-        try {
-            const response = await fetch('/data.json');
-            if (!response.ok) {
-                throw new Error('Network response was not ok');
-            }
-            const data: ItemData[] = await response.json();
+    private initializeProducts() {
+        const select = this.element.querySelector('.product-select') as HTMLSelectElement;
+        select.innerHTML = '<option value="">Select a product</option>';
+        
+        this.products.forEach(product => {
+            const option = document.createElement('option');
+            option.value = product.name;
+            option.textContent = product.name;
+            select.appendChild(option);
+        });
+    }
+
+    private updateSizes(product: Product) {
+        const sizeGroup = this.element.querySelector('.size-group') as HTMLDivElement;
+        const sizeSelect = this.element.querySelector('.size-select') as HTMLSelectElement;
+        sizeSelect.innerHTML = '';
+
+        product.sizes.forEach((size, index) => {
+            const option = document.createElement('option');
+            option.value = size.size;
+            option.textContent = size.size;
+            option.dataset.price = size.price.toString();
+            sizeSelect.appendChild(option);
             
-            if (!Array.isArray(data)) {
-                throw new Error('Invalid data format');
+            // Auto-select first size
+            if (index === 0) {
+                option.selected = true;
+                // Set initial price when first size is selected
+                const priceInput = this.element.querySelector('.price-input') as HTMLInputElement;
+                const quantity = parseFloat((this.element.querySelector('.quantity-input') as HTMLInputElement).value) || 1;
+                priceInput.value = (size.price * quantity).toFixed(2);
             }
+        });
 
-            // Clear existing options except the default one
-            while (this.dropdown.options.length > 1) {
-                this.dropdown.remove(1);
-            }
+        sizeGroup.style.display = 'block';
+        this.showQuantityAndPrice();
+        this.updatePrice();
 
-            // Populate the dropdown with options
-            data.forEach(item => {
-                const option = document.createElement('option');
-                option.value = item.name;
-                option.textContent = item.name;
-                
-                // Store the complete item data
-                option.dataset.itemData = JSON.stringify(item);
-                
-                this.dropdown.appendChild(option);
-            });
-
-        } catch (error) {
-            console.error('Error loading items data:', error);
-            alert('Error loading items. Please refresh the page or try again later.');
-        }
+        // Add change event listener to size select
+        sizeSelect.addEventListener('change', () => {
+            this.updatePrice();
+        });
     }
 
-    private setupEventListeners(): void {
-        if (!this.dropdown || !this.sizeDropdown || !this.optionDropdown || !this.quantityInput || 
-            !this.descriptionGroup || !this.description || !this.priceLabel || 
-            !this.sizeLabel || !this.optionLabel) {
-            throw new Error('Required elements not found in container');
-        }
-
-        // Bind event handlers to this instance
-        this.dropdown.addEventListener('change', () => this.handleItemSelection());
-        this.sizeDropdown.addEventListener('change', () => this.handleSizeSelection());
-        this.optionDropdown.addEventListener('change', () => this.handleOptionSelection());
-        this.quantityInput.addEventListener('input', () => this.checkItemSelection());
-    }
-
-    private handleItemSelection(): void {
-        // Reset and hide all dependent fields
-        this.descriptionGroup.style.display = 'none';
-        this.description.textContent = '';
-        this.sizeLabel.closest('.form-group')?.classList.add('hidden');
-        this.optionLabel.closest('.form-group')?.classList.add('hidden');
-        this.quantityInput.closest('.form-group')?.classList.add('hidden');
-        this.priceLabel.style.display = 'none';
-        this.sizeDropdown.innerHTML = '<option value="" disabled selected>Select size</option>';
-        this.optionDropdown.innerHTML = '<option value="" disabled selected>Select option</option>';
-        this.quantityInput.value = '';
-
-        const selectedOption = this.dropdown.options[this.dropdown.selectedIndex];
-        if (!selectedOption || !selectedOption.value) return;
-
-        try {
-            const itemData = JSON.parse(selectedOption.dataset.itemData || '');
-            
-            // Show description if available
-            if (itemData.description) {
-                this.description.textContent = itemData.description;
-                this.descriptionGroup.style.display = 'block';
-            }
-
-            // Handle items with only name and price (no size)
-            if (itemData.price && !itemData.size && !itemData.sizes) {
-                // Show price
-                this.priceLabel.textContent = `Price: R${itemData.price.toFixed(2)}`;
-                this.priceLabel.style.display = 'block';
+    private updateOptions(product: Product) {
+        const optionGroup = this.element.querySelector('.option-group') as HTMLDivElement;
+        const optionSelect = this.element.querySelector('.option-select') as HTMLSelectElement;
+        
+        if (product.options && product.options.length > 0) {
+            optionSelect.innerHTML = '';
+            product.options.forEach((option, index) => {
+                const optElement = document.createElement('option');
+                optElement.value = option;
+                optElement.textContent = option;
+                optionSelect.appendChild(optElement);
                 
-                // Show quantity input directly
-                this.quantityInput.closest('.form-group')?.classList.remove('hidden');
-                
-                // Update button states
-                this.checkItemSelection();
-            }
-            // Handle items with fixed size/price
-            else if (itemData.size && itemData.price) {
-                // Show size dropdown
-                this.sizeLabel.closest('.form-group')?.classList.remove('hidden');
-                
-                // Set the fixed size option
-                this.sizeDropdown.innerHTML = `<option value="${itemData.size}">${itemData.size}</option>`;
-                this.sizeDropdown.value = itemData.size;
-                
-                // Show price
-                this.priceLabel.textContent = `Price: R${itemData.price.toFixed(2)}`;
-                this.priceLabel.style.display = 'block';
-                
-                // Show quantity input directly for fixed-size items
-                this.quantityInput.closest('.form-group')?.classList.remove('hidden');
-                
-                // Update button states
-                this.checkItemSelection();
-            } 
-            // Handle items with size variations
-            else if (Array.isArray(itemData.sizes)) {
-                // Show size dropdown
-                this.sizeLabel.closest('.form-group')?.classList.remove('hidden');
-                
-                // Clear and add default option
-                this.sizeDropdown.innerHTML = '';
-                
-                // Populate size options
-                itemData.sizes.forEach((sizeData: { size: string; price: number }, index: number) => {
-                    const option = document.createElement('option');
-                    option.value = sizeData.size;
-                    option.textContent = sizeData.size;
-                    option.dataset.price = sizeData.price.toString();
-                    this.sizeDropdown.appendChild(option);
-                    
-                    // Select first size by default
-                    if (index === 0) {
-                        option.selected = true;
-                        this.priceLabel.textContent = `Price: R${sizeData.price.toFixed(2)}`;
-                        this.priceLabel.style.display = 'block';
-                    }
-                });
-                
-                // Trigger size selection handler to show options if available
-                this.handleSizeSelection();
-            }
-        } catch (error) {
-            console.error('Error parsing item data:', error);
-        }
-    }
-
-    private handleSizeSelection(): void {
-        // Reset and hide dependent fields
-        this.optionLabel.closest('.form-group')?.classList.add('hidden');
-        this.quantityInput.closest('.form-group')?.classList.add('hidden');
-        this.optionDropdown.innerHTML = '<option value="" disabled selected>Select option</option>';
-        this.quantityInput.value = '';
-
-        const selectedOption = this.dropdown.options[this.dropdown.selectedIndex];
-        if (!selectedOption || !selectedOption.value) return;
-
-        try {
-            const itemData = JSON.parse(selectedOption.dataset.itemData || '');
-            const selectedSize = this.sizeDropdown.value;
-            
-            // Find price for selected size
-            if (Array.isArray(itemData.sizes)) {
-                const sizeData = itemData.sizes.find((s: { size: string }) => s.size === selectedSize);
-                if (sizeData) {
-                    this.priceLabel.textContent = `Price: R${sizeData.price.toFixed(2)}`;
-                    this.priceLabel.style.display = 'block';
+                // Auto-select first option
+                if (index === 0) {
+                    optElement.selected = true;
                 }
-            }
-
-            // Show options if available
-            if (Array.isArray(itemData.options) && itemData.options.length > 0) {
-                this.optionLabel.closest('.form-group')?.classList.remove('hidden');
-                this.optionDropdown.required = true;
-                
-                // Clear and add options
-                this.optionDropdown.innerHTML = '';
-                
-                // Add actual options
-                itemData.options.forEach((option: string, index: number) => {
-                    const optElement = document.createElement('option');
-                    optElement.value = option;
-                    optElement.textContent = option;
-                    this.optionDropdown.appendChild(optElement);
-                    
-                    // Select first option by default
-                    if (index === 0) {
-                        optElement.selected = true;
-                    }
-                });
-                
-                // Trigger option selection handler to show quantity input
-                this.handleOptionSelection();
-            } else {
-                // If no options, show quantity input directly and remove required attribute
-                this.optionDropdown.required = false;
-                this.quantityInput.closest('.form-group')?.classList.remove('hidden');
-                this.checkItemSelection();
-            }
-        } catch (error) {
-            console.error('Error handling size selection:', error);
-        }
-    }
-
-    private handleOptionSelection(): void {
-        // Show quantity input when an option is selected
-        if (this.optionDropdown.value) {
-            this.quantityInput.closest('.form-group')?.classList.remove('hidden');
-            this.checkItemSelection();
+            });
+            optionGroup.style.display = 'block';
         } else {
-            this.quantityInput.closest('.form-group')?.classList.add('hidden');
-            this.quantityInput.value = '';
+            optionGroup.style.display = 'none';
+            optionSelect.innerHTML = '<option value="">No options available</option>';
         }
     }
 
-    private checkItemSelection(): void {
-        // Check if we have a valid item and quantity
-        const hasValidItem = this.dropdown.value && 
-                           this.quantityInput.value && 
-                           parseFloat(this.quantityInput.value) > 0;
-
-        // Check if option is required and selected
-        const hasValidOption = !this.optionDropdown.required || 
-                             (this.optionDropdown.value && this.optionDropdown.value !== '');
-
-        // Get buttons from the document
-        const addItemBtn = document.getElementById('addItemBtn') as HTMLButtonElement;
-        const generateInvoiceBtn = document.getElementById('generateInvoiceBtn') as HTMLButtonElement;
-
-        // Enable/disable buttons based on valid selection
-        if (addItemBtn) addItemBtn.disabled = !(hasValidItem && hasValidOption);
-        if (generateInvoiceBtn) generateInvoiceBtn.disabled = !(hasValidItem && hasValidOption);
+    private showQuantityAndPrice() {
+        const quantityGroup = this.element.querySelector('.quantity-group') as HTMLDivElement;
+        const priceGroup = this.element.querySelector('.price-group') as HTMLDivElement;
+        quantityGroup.style.display = 'block';
+        priceGroup.style.display = 'block';
     }
 
-    public getElement(): HTMLElement {
+    private addEventListeners() {
+        const productSelect = this.element.querySelector('.product-select') as HTMLSelectElement;
+        if (productSelect) {
+            productSelect.addEventListener('change', () => {
+                const selectedProduct = this.products.find(p => p.name === productSelect.value);
+                const descriptionElement = this.element.querySelector('.product-description') as HTMLDivElement;
+                const descriptionGroup = this.element.querySelector('.description-group') as HTMLDivElement;
+                
+                if (descriptionElement && descriptionGroup) {
+                    if (selectedProduct?.description) {
+                        descriptionElement.textContent = selectedProduct.description;
+                        descriptionGroup.style.display = 'block';
+                    } else {
+                        descriptionElement.textContent = '';
+                        descriptionGroup.style.display = 'none';
+                    }
+                }
+                
+                if (selectedProduct) {
+                    this.updateSizes(selectedProduct);
+                    this.updateOptions(selectedProduct);
+                } else {
+                    // Hide all dependent fields if no product is selected
+                    const sizeGroup = this.element.querySelector('.size-group') as HTMLDivElement;
+                    const optionGroup = this.element.querySelector('.option-group') as HTMLDivElement;
+                    const quantityGroup = this.element.querySelector('.quantity-group') as HTMLDivElement;
+                    const priceGroup = this.element.querySelector('.price-group') as HTMLDivElement;
+                    
+                    if (sizeGroup) sizeGroup.style.display = 'none';
+                    if (optionGroup) optionGroup.style.display = 'none';
+                    if (quantityGroup) quantityGroup.style.display = 'none';
+                    if (priceGroup) priceGroup.style.display = 'none';
+                    if (descriptionGroup) descriptionGroup.style.display = 'none';
+                }
+            });
+        }
+
+        const quantityInput = this.element.querySelector('.quantity-input') as HTMLInputElement;
+
+        // When quantity changes, update total
+        quantityInput.addEventListener('input', () => {
+            this.updatePrice();
+        });
+    }
+
+    private updatePrice() {
+        const sizeSelect = this.element.querySelector('.size-select') as HTMLSelectElement;
+        const selectedOption = sizeSelect.options[sizeSelect.selectedIndex];
+        const priceInput = this.element.querySelector('.price-input') as HTMLInputElement;
+        const quantityInput = this.element.querySelector('.quantity-input') as HTMLInputElement;
+        const quantity = parseFloat(quantityInput.value) || 1;
+
+        if (selectedOption && selectedOption.dataset.price) {
+            const basePrice = parseFloat(selectedOption.dataset.price);
+            const total = basePrice * quantity;
+            priceInput.value = total.toFixed(2);
+        } else {
+            priceInput.value = '0.00';
+        }
+
+        this.dispatchUpdateEvent();
+    }
+
+    private dispatchUpdateEvent() {
+        const productSelect = this.element.querySelector('.product-select') as HTMLSelectElement;
+        const sizeSelect = this.element.querySelector('.size-select') as HTMLSelectElement;
+        const optionSelect = this.element.querySelector('.option-select') as HTMLSelectElement;
+        const quantity = parseFloat((this.element.querySelector('.quantity-input') as HTMLInputElement).value) || 0;
+        const price = parseFloat((this.element.querySelector('.price-input') as HTMLInputElement).value) || 0;
+
+        const event = new CustomEvent('item-updated', {
+            detail: {
+                id: this.id,
+                productId: productSelect.value,
+                size: sizeSelect.value,
+                option: optionSelect.value,
+                quantity: quantity,
+                price: price,
+                total: price
+            },
+            bubbles: true
+        });
+        this.element.dispatchEvent(event);
+    }
+
+    public getElement(): HTMLDivElement {
         return this.element;
+    }
+
+    public getData() {
+        const productSelect = this.element.querySelector('.product-select') as HTMLSelectElement;
+        const sizeSelect = this.element.querySelector('.size-select') as HTMLSelectElement;
+        const optionSelect = this.element.querySelector('.option-select') as HTMLSelectElement;
+        const quantity = this.element.querySelector('.quantity-input') as HTMLInputElement;
+        const price = this.element.querySelector('.price-input') as HTMLInputElement;
+
+        return {
+            productId: productSelect.value,
+            size: sizeSelect.value,
+            option: optionSelect.value,
+            quantity: parseFloat(quantity.value) || 0,
+            price: parseFloat(price.value) || 0
+        };
     }
 } 

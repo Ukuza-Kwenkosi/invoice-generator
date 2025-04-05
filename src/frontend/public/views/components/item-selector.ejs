@@ -1,0 +1,50 @@
+<div class="item">
+    <div class="form-group">
+        <label for="item-dropdown-PLACEHOLDER">Item</label>
+        <select id="item-dropdown-PLACEHOLDER" class="form-control" required>
+            <option value="" disabled selected>Select item</option>
+            <% if (typeof items !== 'undefined' && Array.isArray(items) && items.length > 0) { %>
+                <% items.forEach(function(item) { %>
+                    <option value="<%= item.id || '' %>"><%= item.name || 'Unnamed Item' %></option>
+                <% }); %>
+            <% } %>
+        </select>
+    </div>
+    
+    <div class="description-group" style="display: none;">
+        <p class="item-description"></p>
+    </div>
+    
+    <div class="form-group">
+        <label class="size-label" for="size-dropdown-PLACEHOLDER">Size</label>
+        <select id="size-dropdown-PLACEHOLDER" class="form-control" required>
+            <option value="" disabled selected>Select size</option>
+            <% if (typeof sizes !== 'undefined' && Array.isArray(sizes) && sizes.length > 0) { %>
+                <% sizes.forEach(function(size) { %>
+                    <option value="<%= size.id || '' %>"><%= size.name || 'N/A' %> - R<%= typeof size.price === 'number' ? size.price.toFixed(2) : '0.00' %></option>
+                <% }); %>
+            <% } %>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label class="option-label" for="option-dropdown-PLACEHOLDER">Option</label>
+        <select id="option-dropdown-PLACEHOLDER" class="form-control" required>
+            <option value="" disabled selected>Select option</option>
+            <% if (typeof options !== 'undefined' && Array.isArray(options) && options.length > 0) { %>
+                <% options.forEach(function(option) { %>
+                    <option value="<%= option.id || '' %>"><%= option.name || 'N/A' %></option>
+                <% }); %>
+            <% } %>
+        </select>
+    </div>
+    
+    <div class="form-group quantity-group hidden">
+        <label for="quantity-PLACEHOLDER">Quantity</label>
+        <input type="number" id="quantity-PLACEHOLDER" class="form-control" min="1" value="1" required>
+    </div>
+    
+    <div class="form-group">
+        <p id="price" style="display: none;">Price: R<span class="price-value">0.00</span></p>
+    </div>
+</div>

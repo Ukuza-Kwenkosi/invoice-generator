@@ -1,0 +1,103 @@
+[
+  {
+    "name": "Carpet Pinboard",
+    "sizes": [
+      {
+        "size": "1.2m h x 2.4m w",
+        "price": 2136
+      },
+      {
+        "size": "1.2m h x 1.8m w",
+        "price": 1702
+      }
+    ],
+    "options": [
+      "Grey",
+      "Brown",
+      "Blue"
+    ],
+    "description": "Carpet pinboard with Aluminium frame"
+  },
+  {
+    "name": "Classic Magnetic Steel",
+    "sizes": [
+      {
+        "size": "1.14m h x 2.4m",
+        "price": 4735
+      }
+    ],
+    "options": [
+      "Chalk",
+      "White"
+    ],
+    "description": "Steel writing board c/w aluminium chalkrail"
+  },
+  {
+    "name": "Classic Magnetic Steel - Folding",
+    "sizes": [
+      {
+        "size": "1.14m h x 3.6m",
+        "price": 14496
+      },
+      {
+        "size": "1.14m h x 4.8m",
+        "price": 18972
+      }
+    ],
+    "options": [
+      "Chalk",
+      "White"
+    ],
+    "description": "Classic steel folding writing boards c/w aluminum chalkrail(5 pc set)"
+  },
+  {
+    "name": "Premium Magnetic",
+    "sizes": [
+      {
+        "size": "1.2m h x 2.4m",
+        "price": 4039
+      }
+    ],
+    "options": [
+      "Chalk",
+      "White"
+    ],
+    "description": "Steel writing board with Aluminium frame & Pentray"
+  },
+  {
+    "name": "Pinboard Fittings",
+    "sizes": [
+      {
+        "size": "2.4m+",
+        "price": 65
+      }
+    ]
+  },
+  {
+    "name": "Classic writing board fittings",
+    "sizes": [
+      {
+        "size": "2.4m+",
+        "price": 95
+      }
+    ]
+  },
+  {
+    "name": "Crating",
+    "sizes": [
+      {
+        "size": "Standard",
+        "price": 1500
+      }
+    ]
+  },
+  {
+    "name": "Fittings",
+    "sizes": [
+      {
+        "size": "Standard",
+        "price": 65
+      }
+    ]
+  }
+]

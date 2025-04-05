@@ -9,7 +9,6 @@
 
 # Production
 /build
-/deploy/dist
 
 # Misc
 .DS_Store
