@@ -30,12 +30,35 @@ interface InvoiceItem {
     option?: string;
 }
 
-// Enable CORS with specific options
+// Helper function to format currency values
+export function formatCurrency(amount: number): string {
+    // Convert to string and split into whole and decimal parts
+    const [whole, decimal] = amount.toFixed(2).split('.');
+    
+    // Add thousand separators to the whole part
+    const formattedWhole = whole
+        .split('')
+        .reverse()
+        .join('')
+        .match(/.{1,3}/g)
+        ?.join(' ')
+        .split('')
+        .reverse()
+        .join('') || whole;
+    
+    // Only show cents if they are non-zero
+    const formattedAmount = decimal === '00' ? formattedWhole : `${formattedWhole}.${decimal}`;
+    
+    // Return formatted amount with R symbol
+    return `R ${formattedAmount}`;
+}
+
+// Enable CORS
 app.use(cors({
-    origin: ['http://localhost:3000', 'https://dctxoovo0tr3t.cloudfront.net'],
-    credentials: true,
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    origin: ['http://localhost:3001'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
 }));
 
 // Increase payload size limit
@@ -78,7 +101,7 @@ app.post('/generate-invoice', async (req, res) => {
         const missingFields = [];
         if (!customerName) missingFields.push('Customer Name');
         if (!customerAddress) missingFields.push('Customer Address');
-        if (!customerEmail) missingFields.push('Customer Email');
+        if (!customerEmail) missingFields.push('Customer Email'); 
         if (!customerPhone) missingFields.push('Customer Phone');
 
         if (missingFields.length > 0) {
@@ -142,12 +165,10 @@ app.post('/generate-invoice', async (req, res) => {
         // Add company logo
         try {
             const logoPath = path.join(__dirname, 'images', 'company_logo.png');
-            console.log('Reading logo from:', logoPath);
             const logoData = fs.readFileSync(logoPath);
             const logoBase64 = `data:image/png;base64,${logoData.toString('base64')}`;
             doc.addImage(logoBase64, 'PNG', leftMargin - 10, topMargin, 91, 46);
         } catch (error) {
-            console.error('Error adding company logo:', error);
             throw new Error(`Failed to add company logo to PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
 
@@ -159,7 +180,6 @@ app.post('/generate-invoice', async (req, res) => {
             doc.text('Reg No 2012/750142/07 TAX No. 9278518254', rightMargin, topMargin + 20, { align: 'right' });
             doc.text('E2144 Osizeni, Newcastle, KiaZulu-Natal, 2952', rightMargin, topMargin + 25, { align: 'right' });
         } catch (error) {
-            console.error('Error adding company details:', error);
             throw new Error('Failed to add company details to PDF');
         }
 
@@ -175,7 +195,6 @@ app.post('/generate-invoice', async (req, res) => {
             doc.text(`Email: ${customerEmail}`, leftMargin, topMargin + customerInfoTopMargin + 10);
             doc.text(`Phone: ${customerPhone}`, leftMargin, topMargin + customerInfoTopMargin + 15);
         } catch (error) {
-            console.error('Error adding customer details:', error);
             throw new Error('Failed to add customer details to PDF');
         }
 
@@ -185,22 +204,21 @@ app.post('/generate-invoice', async (req, res) => {
             const tableRows: string[][] = [];
             let totalAmount = 0;
             
-            console.log('Processing items...');
             items.forEach((item: InvoiceItem, index: number) => {
                 if (!item.name || !item.quantity || !item.price) {
                     throw new Error(`Invalid item data at index ${index}: Missing required fields`);
                 }
 
-                console.log(`Processing item ${index + 1}:`, item);
-                const VAT = 1.15;
-                const total = item.price * item.quantity * VAT;
-                const price = item.price * VAT;
+                // Ensure price is treated as a whole number
+                const price = Math.round(item.price);
+                const total = price * item.quantity;
                 totalAmount += total;
                 
                 const description = `${item.name}${item.description ? ` - ${item.description}` : ''}${item.size ? ` - ${item.size}` : ''}${item.option ? ` - ${item.option}` : ''}`;
                 
-                const formattedPrice = `R ${price.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
-                const formattedTotal = `R ${total.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+                // Format prices using the new formatCurrency function
+                const formattedPrice = formatCurrency(price).replace('R ', '');
+                const formattedTotal = formatCurrency(total);
                 
                 tableRows.push([
                     description,
@@ -210,51 +228,50 @@ app.post('/generate-invoice', async (req, res) => {
                 ]);
             });
 
-            console.log('Generating table...');
+            // Format total amount using the new formatCurrency function
+            const formattedTotalAmount = formatCurrency(totalAmount);
+
             doc.autoTable({
                 head: [tableColumn],
                 body: tableRows,
-                startY: topMargin + 80,
+                startY: topMargin + 90,
                 margin: { top: 0, left: leftMargin, right: leftMargin },
                 theme: 'grid',
                 headStyles: {
                     fillColor: [255, 99, 71],
                     textColor: [255, 255, 255],
                     halign: 'center',
-                    fontSize: 10,
+                    fontSize: 8,
                     cellPadding: 2
                 },
                 alternateRowStyles: {
-                    fillColor: [245, 245, 245]
+                    fillColor: [245, 245, 245],
+                    fontSize: 8
                 },
                 foot: [['', '', 
-                    { content: 'Total', styles: { halign: 'center', fontSize: 10, cellPadding: 2 } }, 
-                    { content: `R ${totalAmount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`, styles: { halign: 'center', fontSize: 10, cellPadding: 2 } }
+                    { content: 'Total', styles: { halign: 'center', fontSize: 8, cellPadding: 2 } }, 
+                    { content: formattedTotalAmount, styles: { halign: 'center', fontSize: 8, cellPadding: 2 } }
                 ]],
                 footStyles: {
                     fillColor: [255, 99, 71],
                     textColor: [0, 0, 0],
                     fontStyle: 'bold',
-                    fontSize: 10,
+                    fontSize: 8,
                     cellPadding: 2
                 },
                 columnStyles: {
                     0: { cellWidth: 'auto', cellPadding: 2 },
-                    1: { cellWidth: 25, halign: 'center', cellPadding: 4 },
-                    2: { cellWidth: 12, halign: 'center', cellPadding: 4 },
+                    1: { cellWidth: 20, halign: 'center', cellPadding: 4 },
+                    2: { cellWidth: 15, halign: 'center', cellPadding: 4 },
                     3: { cellWidth: 30, halign: 'center', cellPadding: 4 }
                 },
                 styles: {
-                    fontSize: 10,
+                    fontSize: 8,
                     cellPadding: 2
                 }
             });
-        } catch (error: unknown) {
-            console.error('Error generating table:', error);
-            if (error instanceof Error) {
-                throw new Error(`Failed to generate table: ${error.message}`);
-            }
-            throw new Error('Failed to generate table: Unknown error');
+        } catch (error) {
+            throw new Error('Failed to generate table');
         }
 
         try {
@@ -278,41 +295,38 @@ app.post('/generate-invoice', async (req, res) => {
             doc.text('450105', leftMargin + 40, finalY + 65);
             doc.text('CABLZAJJ', leftMargin + 40, finalY + 72);
 
-            // Add terms and conditions
-            const termsY = docHeight - 30 - 9; // Move up by 30%
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'bold');
+            // Add Terms and Conditions
+            const termsY = finalY + 105;
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
             doc.text('Terms & Conditions:', leftMargin, termsY);
-            doc.text('1. This quote is valid for 30 days from the date of issue.', leftMargin, termsY + 7);
-            doc.text('2. Payment terms: 50% deposit required to confirm order.', leftMargin, termsY + 14);
-            doc.text('3. Delivery time: 2-3 weeks after confirmation of order.', leftMargin, termsY + 21);
+            doc.text('1. This quote is valid for 30 days from the date of issue.', leftMargin, termsY + 5);
+            doc.text('2. 4. Terms are strictly Nett for payment of a 50% deposit with order and 50% balance prior to collection.', leftMargin, termsY + 10);
+            doc.text('3. Delivery time: 2-3 weeks after confirmation of order.', leftMargin, termsY + 15);
         } catch (error) {
-            console.error('Error adding footer details:', error);
             throw new Error('Failed to add footer details to PDF');
         }
 
-        console.log('Generating PDF buffer...');
         // Set response headers
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=invoice-${quoteNo}.pdf`);
 
         // Send the PDF
         const pdfBuffer = doc.output('arraybuffer');
-        console.log('Sending PDF response...');
         res.send(Buffer.from(pdfBuffer));
     } catch (error: any) {
-        console.error('Error generating invoice:', error);
-        console.error('Stack trace:', error.stack);
         res.status(500).json({ 
             error: 'Error generating invoice',
-            details: error.message,
-            stack: error.stack,
-            timestamp: new Date().toISOString()
+            details: error.message
         });
     }
 });
 
 // Start the server
-app.listen(Number(port), '0.0.0.0', () => {
-    console.log(`Server is running on port ${port}`);
-}); 
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(Number(port), '0.0.0.0', () => {
+        console.log(`Server is running on port ${port}`);
+    }); 
+}
+
+export { app }; 

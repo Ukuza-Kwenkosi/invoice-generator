@@ -1,16 +1,4 @@
-import { apiService } from '../services/api.js';
-
-interface ProductSize {
-    size: string;
-    price: number;
-}
-
-interface Product {
-    name: string;
-    sizes: ProductSize[];
-    options?: string[];
-    description?: string;
-}
+import { Product } from '../models/types.js';
 
 export class ItemSelectorComponent {
     private element: HTMLDivElement;
@@ -65,15 +53,15 @@ export class ItemSelectorComponent {
                         <option value="">Select an option</option>
                     </select>
                 </div>
-            </div>
-            <div class="form-row">
                 <div class="form-group col-md-3 quantity-group" style="display: none;">
                     <label for="${this.id}-quantity">Quantity</label>
                     <input type="number" class="form-control quantity-input" id="${this.id}-quantity" value="1" min="1" required>
                 </div>
-                <div class="form-group col-md-3 price-group" style="display: none;">
-                    <label for="${this.id}-price">Price</label>
-                    <input type="number" class="form-control price-input" id="${this.id}-price" value="0.00" readonly>
+                <div class="form-group col-md-5 price-group" style="display: none;">
+                    <div style="display: flex;align-items: center;justify-content: flex-end;margin-right: 121px;">
+                        <label for="item1-price" style="margin-right: 10px;margin-top: 0;">Price:</label>
+                        <input type="text" class="form-control price-input" id="item1-price" value="R0.00" readonly="" style="width: 79px;text-align: right;padding-right: 10px;">
+                    </div>
                 </div>
             </div>
         `;
@@ -100,22 +88,56 @@ export class ItemSelectorComponent {
     private updateSizes(product: Product) {
         const sizeGroup = this.element.querySelector('.size-group') as HTMLDivElement;
         const sizeSelect = this.element.querySelector('.size-select') as HTMLSelectElement;
+        const priceInput = this.element.querySelector('.price-input') as HTMLInputElement;
         sizeSelect.innerHTML = '';
 
         product.sizes.forEach((size, index) => {
             const option = document.createElement('option');
             option.value = size.size;
-            option.textContent = size.size;
-            option.dataset.price = size.price.toString();
+            
+            // Store the raw price value in the dataset
+            option.dataset.rawPrice = size.price.toString();
+            
+            // Format the price with spaces, only showing cents if non-zero
+            const [whole, cents] = size.price.toFixed(2).split('.');
+            const formattedWhole = whole
+                .split('')
+                .reverse()
+                .join('')
+                .match(/.{1,3}/g)
+                ?.join(' ')
+                .split('')
+                .reverse()
+                .join('') || whole;
+            
+            const formattedPrice = cents === '00' ? formattedWhole : `${formattedWhole}.${cents}`;
+            option.textContent = `${size.size} - R ${formattedPrice}`;
             sizeSelect.appendChild(option);
             
             // Auto-select first size
             if (index === 0) {
                 option.selected = true;
                 // Set initial price when first size is selected
-                const priceInput = this.element.querySelector('.price-input') as HTMLInputElement;
                 const quantity = parseFloat((this.element.querySelector('.quantity-input') as HTMLInputElement).value) || 1;
-                priceInput.value = (size.price * quantity).toFixed(2);
+                const total = size.price * quantity;
+                
+                // Store the raw numeric value in a data attribute
+                priceInput.dataset.rawValue = total.toString();
+                
+                // Format the total with spaces, only showing cents if non-zero
+                const [totalWhole, totalCents] = total.toFixed(2).split('.');
+                const formattedTotalWhole = totalWhole
+                    .split('')
+                    .reverse()
+                    .join('')
+                    .match(/.{1,3}/g)
+                    ?.join(' ')
+                    .split('')
+                    .reverse()
+                    .join('') || totalWhole;
+                
+                const formattedTotal = totalCents === '00' ? formattedTotalWhole : `${formattedTotalWhole}.${totalCents}`;
+                priceInput.value = `R ${formattedTotal}`;
             }
         });
 
@@ -212,37 +234,28 @@ export class ItemSelectorComponent {
         const quantityInput = this.element.querySelector('.quantity-input') as HTMLInputElement;
         const quantity = parseFloat(quantityInput.value) || 1;
 
-        if (selectedOption && selectedOption.dataset.price) {
-            const basePrice = parseFloat(selectedOption.dataset.price);
+        if (selectedOption && selectedOption.dataset.rawPrice) {
+            const basePrice = parseFloat(selectedOption.dataset.rawPrice);
             const total = basePrice * quantity;
-            priceInput.value = total.toFixed(2);
-        } else {
-            priceInput.value = '0.00';
+            
+            // Store the total in the data attribute
+            priceInput.dataset.rawValue = total.toString();
+            
+            // Format the number with spaces, only showing cents if non-zero
+            const [whole, cents] = total.toFixed(2).split('.');
+            const formattedWhole = whole
+                .split('')
+                .reverse()
+                .join('')
+                .match(/.{1,3}/g)
+                ?.join(' ')
+                .split('')
+                .reverse()
+                .join('') || whole;
+            
+            const formattedTotal = cents === '00' ? formattedWhole : `${formattedWhole}.${cents}`;
+            priceInput.value = `R ${formattedTotal}`;
         }
-
-        this.dispatchUpdateEvent();
-    }
-
-    private dispatchUpdateEvent() {
-        const productSelect = this.element.querySelector('.product-select') as HTMLSelectElement;
-        const sizeSelect = this.element.querySelector('.size-select') as HTMLSelectElement;
-        const optionSelect = this.element.querySelector('.option-select') as HTMLSelectElement;
-        const quantity = parseFloat((this.element.querySelector('.quantity-input') as HTMLInputElement).value) || 0;
-        const price = parseFloat((this.element.querySelector('.price-input') as HTMLInputElement).value) || 0;
-
-        const event = new CustomEvent('item-updated', {
-            detail: {
-                id: this.id,
-                productId: productSelect.value,
-                size: sizeSelect.value,
-                option: optionSelect.value,
-                quantity: quantity,
-                price: price,
-                total: price
-            },
-            bubbles: true
-        });
-        this.element.dispatchEvent(event);
     }
 
     public getElement(): HTMLDivElement {
@@ -250,18 +263,21 @@ export class ItemSelectorComponent {
     }
 
     public getData() {
-        const productSelect = this.element.querySelector('.product-select') as HTMLSelectElement;
+        const nameInput = this.element.querySelector('.product-select') as HTMLSelectElement;
+        const descriptionElement = this.element.querySelector('.product-description') as HTMLDivElement;
+        const sizeInput = this.element.querySelector('.size-select') as HTMLSelectElement;
+        const optionInput = this.element.querySelector('.option-select') as HTMLSelectElement;
+        const quantityInput = this.element.querySelector('.quantity-input') as HTMLInputElement;
         const sizeSelect = this.element.querySelector('.size-select') as HTMLSelectElement;
-        const optionSelect = this.element.querySelector('.option-select') as HTMLSelectElement;
-        const quantity = this.element.querySelector('.quantity-input') as HTMLInputElement;
-        const price = this.element.querySelector('.price-input') as HTMLInputElement;
-
+        const selectedOption = sizeSelect.options[sizeSelect.selectedIndex];
+        
         return {
-            productId: productSelect.value,
-            size: sizeSelect.value,
-            option: optionSelect.value,
-            quantity: parseFloat(quantity.value) || 0,
-            price: parseFloat(price.value) || 0
+            name: nameInput.value,
+            description: descriptionElement.textContent || '',
+            size: sizeInput.value,
+            option: optionInput.value,
+            quantity: parseInt(quantityInput.value) || 0,
+            price: selectedOption ? parseFloat(selectedOption.dataset.rawPrice || '0') : 0 // Send base price
         };
     }
 } 

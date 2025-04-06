@@ -17,12 +17,18 @@ function cleanDeploy() {
 // Compile TypeScript files
 function compileTypeScript() {
     console.log('\n2. Compiling TypeScript');
-    require('child_process').execSync('tsc --project tsconfig.json', { stdio: 'inherit' });
+    try {
+        require('child_process').execSync('tsc --project tsconfig.json', { stdio: 'inherit' });
+        console.log('✓ TypeScript compilation completed');
+    } catch (error) {
+        console.error('✗ TypeScript compilation failed:', error);
+        process.exit(1);
+    }
 }
 
 // Compile EJS templates to HTML
 function compileEjsTemplates() {
-    console.log('\n2. Compiling EJS templates to HTML');
+    console.log('\n3. Compiling EJS templates to HTML');
     const publicDir = path.join(__dirname, 'public');
     const distDir = path.join(__dirname, 'deploy', 'dist');
     const viewsDir = path.join(publicDir, 'views');
@@ -72,7 +78,7 @@ function compileEjsTemplates() {
 
 // Copy static files (excluding EJS files)
 function copyStaticFiles() {
-    console.log('\n3. Copying static files');
+    console.log('\n4. Copying static files');
     const publicDir = path.join(__dirname, 'public');
     const distDir = path.join(__dirname, 'deploy', 'dist');
     
@@ -224,10 +230,10 @@ function validateBuild() {
 async function build() {
     try {
         cleanDeploy();
-        compileTypeScript();      // Compile TypeScript first
-        compileEjsTemplates();    // Then compile EJS
-        copyStaticFiles();        // Then copy static assets
-        validateBuild();          // Finally validate everything
+        compileTypeScript();
+        compileEjsTemplates();
+        copyStaticFiles();
+        validateBuild();
         console.log('\n✓ Build completed successfully');
     } catch (err) {
         console.error('\n✗ Build failed:', err);
@@ -238,7 +244,6 @@ async function build() {
 // Run build process
 try {
     console.log('\n=== Starting Build Process ===');
-    
     build();
 } catch (error) {
     console.error('\n✗ Build failed:', error.message);

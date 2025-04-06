@@ -24,8 +24,8 @@ try {
 // 2. Compile TypeScript files
 console.log('2. Compiling TypeScript files');
 try {
-    // Compile all TypeScript files to deploy/dist
-    await execAsync('tsc --outDir deploy/dist', { stdio: 'inherit' });
+    // Compile all TypeScript files using tsconfig.json
+    await execAsync('tsc -p tsconfig.json', { stdio: 'inherit' });
     console.log('✓ TypeScript compilation completed\n');
 } catch (error) {
     console.error('Error compiling TypeScript:', error);
@@ -128,18 +128,21 @@ try {
                 const newRelativePath = path.join(relativePath, entry.name);
 
                 if (entry.isDirectory()) {
-                    // Skip node_modules and other unnecessary directories
-                    if (entry.name === 'node_modules' || entry.name === '.git') {
+                    // Skip node_modules, test directories, and other unnecessary directories
+                    if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'tests') {
                         continue;
                     }
                     structure.dirs.push(newRelativePath);
                     await traverse(fullPath, newRelativePath);
                 } else {
-                    // For TypeScript files, store the .js version in deploy structure
-                    const fileName = entry.name.endsWith('.ts') ? 
-                        newRelativePath.replace(/\.ts$/, '.js') : 
-                        newRelativePath;
-                    structure.files.push(fileName);
+                    // Skip test files and TypeScript files
+                    if (!entry.name.endsWith('.test.ts') && !entry.name.endsWith('.test.js')) {
+                        // For TypeScript files, store the .js version in deploy structure
+                        const fileName = entry.name.endsWith('.ts') ? 
+                            newRelativePath.replace(/\.ts$/, '.js') : 
+                            newRelativePath;
+                        structure.files.push(fileName);
+                    }
                 }
             }
         };

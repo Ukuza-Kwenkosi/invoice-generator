@@ -26,4 +26,16 @@ export interface ApiResponse<T = any> {
     success: boolean;
     data?: T;
     error?: string;
+}
+
+export interface ProductSize {
+    size: string;
+    price: number;
+}
+
+export interface Product {
+    name: string;
+    sizes: ProductSize[];
+    options?: string[];
+    description?: string;
 } 

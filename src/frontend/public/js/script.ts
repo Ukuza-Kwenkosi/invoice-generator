@@ -1,20 +1,11 @@
-import { ItemData } from './models/types.js';
+import { InvoiceData, Product } from './models/types.js';
 import { ItemSelectorComponent } from './components/item-selector.js';
 import { apiService } from './services/api.js';
-import { InvoiceData } from './models/types.js';
 
 // Global variables
 let itemCount: number = 1;
 let companyLogo: HTMLImageElement = new Image();
-let products: any[] = []; // Store products globally
-
-// Global variables to store logo colors - using brand colors common in South African businesses
-// @ts-ignore - Will be used in PDF generation
-let logoPrimaryColor: [number, number, number] = [255, 99, 71]; // Darker red for table header
-// @ts-ignore - Will be used in PDF generation
-let logoSecondaryColor: [number, number, number] = [245, 245, 245]; // Very light gray for alternating rows
-// @ts-ignore - Will be used in PDF generation
-let footerColor: [number, number, number] = [211, 211, 211]; // Light grey for footer
+let products: Product[] = []; // Store products globally
 
 // Preload company logo for PDF - improved handling
 function preloadLogo(): void {
@@ -125,12 +116,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const items = Array.from(document.querySelectorAll('.invoice-item')).map(item => {
                     const productSelect = item.querySelector('.product-select') as HTMLSelectElement;
                     const selectedProduct = products.find(p => p.name === productSelect.value);
+                    const sizeSelect = item.querySelector('.size-select') as HTMLSelectElement;
+                    const selectedOption = sizeSelect.options[sizeSelect.selectedIndex];
+                    // Get base price from size select instead of total from price input
+                    const basePrice = selectedOption ? parseFloat(selectedOption.dataset.rawPrice || '0') : 0;
                     return {
                         name: productSelect.value,
-                        size: (item.querySelector('.size-select') as HTMLSelectElement).value,
+                        size: sizeSelect.value,
                         option: (item.querySelector('.option-select') as HTMLSelectElement).value || undefined,
                         quantity: parseInt((item.querySelector('.quantity-input') as HTMLInputElement).value) || 0,
-                        price: parseFloat((item.querySelector('.price-input') as HTMLInputElement).value) || 0,
+                        price: basePrice, // Send base price instead of total
                         description: selectedProduct?.description || undefined
                     };
                 });

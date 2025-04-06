@@ -1,6 +1,7 @@
 # Dependencies
 /node_modules
 /src/frontend/node_modules
+/src/backend/node_modules
 /.pnp
 .pnp.js
 
@@ -9,6 +10,8 @@
 
 # Production
 /build
+/deploy
+/dist
 
 # Misc
 .DS_Store
@@ -24,3 +27,8 @@ yarn-error.log*
 function.zip
 *.pdf
 invoices/
+
+# JavaScript files
+*.js
+!src/backend/server.js
+!src/backend/deploy.cjs
