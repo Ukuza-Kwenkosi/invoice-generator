@@ -6,19 +6,65 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import session from 'express-session';
+import dotenv from 'dotenv';
+import { getAllProducts } from './data/file-db.js';
+import { AuthService } from './auth/authService.js';
+import { authenticateToken } from './auth/middleware.js';
+import { formatCurrency } from './utils/formatting.js';
+// Load environment variables
+dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+// Session configuration
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'default-secret-key',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+}));
 // Enable CORS
 app.use(cors({
-    origin: ['http://localhost:3001'],
+    origin: ['http://localhost:3000', 'http://localhost:3001'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 }));
 // Increase payload size limit
 app.use(express.json({ limit: '10mb' }));
+// Authentication middleware
+const isAuthenticated = (req, res, next) => {
+    if (req.session.isAuthenticated) {
+        next();
+    }
+    else {
+        res.status(401).json({ success: false, error: 'Not authenticated' });
+    }
+};
+// Login endpoint
+app.post('/auth/login', async (req, res) => {
+    const response = await AuthService.login(req.body);
+    res.status(response.success ? 200 : 401).json(response);
+});
+// Logout endpoint
+app.post('/auth/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            res.status(500).json({
+                success: false,
+                error: 'Failed to logout'
+            });
+        }
+        else {
+            res.json({ success: true });
+        }
+    });
+});
 // Add logging middleware
 app.use((req, res, next) => {
     console.log(`${req.method} ${req.path}`);
@@ -28,17 +74,15 @@ app.use((req, res, next) => {
     }
     next();
 });
-// Products endpoint
-app.get('/products', (req, res) => {
+// Public routes
+app.get('/products', async (req, res) => {
     try {
-        const dataPath = path.join(__dirname, 'data', 'data.json');
-        console.log('Reading products from:', dataPath);
-        const products = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+        const products = await getAllProducts();
         res.json(products);
     }
     catch (error) {
-        console.error('Error reading products:', error);
-        res.status(500).json({ error: 'Failed to load products', details: error.message });
+        console.error('Error getting products:', error);
+        res.status(500).json({ error: 'Failed to get products' });
     }
 });
 // Health check endpoint
@@ -46,7 +90,7 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
 });
 // Invoice generation endpoint
-app.post('/generate-invoice', async (req, res) => {
+app.post('/generate-invoice', authenticateToken, async (req, res) => {
     try {
         const { customerName, customerAddress, customerEmail, customerPhone, items } = req.body;
         // Validate customer details
@@ -153,22 +197,23 @@ app.post('/generate-invoice', async (req, res) => {
                 if (!item.name || !item.quantity || !item.price) {
                     throw new Error(`Invalid item data at index ${index}: Missing required fields`);
                 }
-                const total = item.price * item.quantity;
+                // Ensure price is treated as a whole number
+                const price = Math.round(item.price);
+                const total = price * item.quantity;
                 totalAmount += total;
                 const description = `${item.name}${item.description ? ` - ${item.description}` : ''}${item.size ? ` - ${item.size}` : ''}${item.option ? ` - ${item.option}` : ''}`;
-                // Format price with spaces (without R)
-                const formattedPrice = item.price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-                // Format total with spaces (with R)
-                const formattedTotal = total.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+                // Format prices using the new formatCurrency function
+                const formattedPrice = formatCurrency(price).replace('R ', '');
+                const formattedTotal = formatCurrency(total);
                 tableRows.push([
                     description,
                     formattedPrice,
                     item.quantity.toString(),
-                    `R ${formattedTotal}`
+                    formattedTotal
                 ]);
             });
-            // Format total amount with spaces (with R)
-            const formattedTotalAmount = totalAmount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+            // Format total amount using the new formatCurrency function
+            const formattedTotalAmount = formatCurrency(totalAmount);
             doc.autoTable({
                 head: [tableColumn],
                 body: tableRows,
@@ -179,31 +224,32 @@ app.post('/generate-invoice', async (req, res) => {
                     fillColor: [255, 99, 71],
                     textColor: [255, 255, 255],
                     halign: 'center',
-                    fontSize: 10,
+                    fontSize: 8,
                     cellPadding: 2
                 },
                 alternateRowStyles: {
-                    fillColor: [245, 245, 245]
+                    fillColor: [245, 245, 245],
+                    fontSize: 8
                 },
                 foot: [['', '',
-                        { content: 'Total', styles: { halign: 'center', fontSize: 10, cellPadding: 2 } },
-                        { content: `R ${formattedTotalAmount}`, styles: { halign: 'center', fontSize: 10, cellPadding: 2 } }
+                        { content: 'Total', styles: { halign: 'center', fontSize: 8, cellPadding: 2 } },
+                        { content: formattedTotalAmount, styles: { halign: 'center', fontSize: 8, cellPadding: 2 } }
                     ]],
                 footStyles: {
                     fillColor: [255, 99, 71],
                     textColor: [0, 0, 0],
                     fontStyle: 'bold',
-                    fontSize: 10,
+                    fontSize: 8,
                     cellPadding: 2
                 },
                 columnStyles: {
                     0: { cellWidth: 'auto', cellPadding: 2 },
-                    1: { cellWidth: 25, halign: 'center', cellPadding: 4 },
-                    2: { cellWidth: 12, halign: 'center', cellPadding: 4 },
+                    1: { cellWidth: 20, halign: 'center', cellPadding: 4 },
+                    2: { cellWidth: 15, halign: 'center', cellPadding: 4 },
                     3: { cellWidth: 30, halign: 'center', cellPadding: 4 }
                 },
                 styles: {
-                    fontSize: 10,
+                    fontSize: 8,
                     cellPadding: 2
                 }
             });
@@ -216,7 +262,7 @@ app.post('/generate-invoice', async (req, res) => {
             // Add bank details
             doc.setFontSize(10);
             doc.setFont('helvetica', 'bold');
-            doc.text('Banking Details 1', leftMargin, finalY + 37);
+            doc.text('Banking Details', leftMargin, finalY + 37);
             doc.setFont('helvetica', 'normal');
             doc.text('Bank:', leftMargin, finalY + 44);
             doc.text('Account Holder:', leftMargin, finalY + 51);
@@ -235,9 +281,8 @@ app.post('/generate-invoice', async (req, res) => {
             doc.setFont('helvetica', 'normal');
             doc.text('Terms & Conditions:', leftMargin, termsY);
             doc.text('1. This quote is valid for 30 days from the date of issue.', leftMargin, termsY + 5);
-            doc.text('2. Payment terms: 50% deposit required to confirm order.', leftMargin, termsY + 10);
+            doc.text('2. 4. Terms are strictly Nett for payment of a 50% deposit with order and 50% balance prior to collection.', leftMargin, termsY + 10);
             doc.text('3. Delivery time: 2-3 weeks after confirmation of order.', leftMargin, termsY + 15);
-            doc.text('4. Terms are strictly Nett for payment of a 50% deposit with order and 50% balance prior to collection.', leftMargin, termsY + 20);
         }
         catch (error) {
             throw new Error('Failed to add footer details to PDF');
@@ -250,13 +295,14 @@ app.post('/generate-invoice', async (req, res) => {
         res.send(Buffer.from(pdfBuffer));
     }
     catch (error) {
-        res.status(500).json({
-            error: 'Error generating invoice',
-            details: error.message
-        });
+        console.error('Error generating invoice:', error);
+        res.status(500).json({ error: 'Failed to generate invoice', details: error.message });
     }
 });
 // Start the server
-app.listen(Number(port), '0.0.0.0', () => {
-    console.log(`Server is running on port ${port}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(Number(port), '0.0.0.0', () => {
+        console.log(`Server is running on port ${port}`);
+    });
+}
+export { app };

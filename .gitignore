@@ -12,6 +12,10 @@
 /build
 /deploy
 /dist
+/src/frontend/deploy
+/src/backend/deploy
+/src/frontend/dist
+/src/backend/dist
 
 # Misc
 .DS_Store

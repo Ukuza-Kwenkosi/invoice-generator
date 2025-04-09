@@ -26,6 +26,10 @@ console.log('2. Compiling TypeScript files');
 try {
     // Compile all TypeScript files using tsconfig.json
     await execAsync('tsc -p tsconfig.json', { stdio: 'inherit' });
+    
+    // Copy the compiled files to deploy/dist
+    await execAsync('cp -r dist/* deploy/dist/', { stdio: 'inherit' });
+    
     console.log('✓ TypeScript compilation completed\n');
 } catch (error) {
     console.error('Error compiling TypeScript:', error);
@@ -77,6 +81,10 @@ try {
     const imagesSrcPath = path.join(srcPath, 'images');
     const imagesDestPath = path.join(deployDistPath, 'images');
     await copyNonTsFiles(imagesSrcPath, imagesDestPath);
+
+    const authSrcPath = path.join(srcPath, 'auth');
+    const authDestPath = path.join(deployDistPath, 'auth');
+    await copyNonTsFiles(authSrcPath, authDestPath);
 
     console.log('✓ Non-TypeScript files copied successfully\n');
 } catch (error) {

@@ -1,11 +1,30 @@
-import express from 'express';
+import 'reflect-metadata';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import session from 'express-session';
+import bcrypt from 'bcryptjs';
+import dotenv from 'dotenv';
+import { DatabaseFactory } from './data/database.factory';
+import { AuthService } from './auth/authService';
+import { authenticateToken } from './auth/middleware';
+import { formatCurrency } from './utils/formatting';
+
+// Get database instance
+const getDatabase = () => DatabaseFactory.getDatabase();
+
+// Load environment variables
+dotenv.config();
+
+// Extend express-session types
+declare module 'express-session' {
+    interface SessionData {
+        isAuthenticated: boolean;
+    }
+}
 
 // Augment jsPDF type to include autoTable
 declare module 'jspdf' {
@@ -17,8 +36,16 @@ declare module 'jspdf' {
 const app = express();
 const port = process.env.PORT || 3000;
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Session configuration
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'default-secret-key',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+}));
 
 // Types
 interface InvoiceItem {
@@ -30,32 +57,9 @@ interface InvoiceItem {
     option?: string;
 }
 
-// Helper function to format currency values
-export function formatCurrency(amount: number): string {
-    // Convert to string and split into whole and decimal parts
-    const [whole, decimal] = amount.toFixed(2).split('.');
-    
-    // Add thousand separators to the whole part
-    const formattedWhole = whole
-        .split('')
-        .reverse()
-        .join('')
-        .match(/.{1,3}/g)
-        ?.join(' ')
-        .split('')
-        .reverse()
-        .join('') || whole;
-    
-    // Only show cents if they are non-zero
-    const formattedAmount = decimal === '00' ? formattedWhole : `${formattedWhole}.${decimal}`;
-    
-    // Return formatted amount with R symbol
-    return `R ${formattedAmount}`;
-}
-
 // Enable CORS
 app.use(cors({
-    origin: ['http://localhost:3001'],
+    origin: ['http://localhost:3000', 'http://localhost:3001'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
@@ -63,6 +67,35 @@ app.use(cors({
 
 // Increase payload size limit
 app.use(express.json({ limit: '10mb' }));
+
+// Authentication middleware
+const isAuthenticated = (req: Request, res: Response, next: NextFunction): void => {
+    if (req.session.isAuthenticated) {
+        next();
+    } else {
+        res.status(401).json({ success: false, error: 'Not authenticated' });
+    }
+};
+
+// Login endpoint
+app.post('/auth/login', async (req: Request, res: Response) => {
+    const response = await AuthService.login(req.body);
+    res.status(response.success ? 200 : 401).json(response);
+});
+
+// Logout endpoint
+app.post('/auth/logout', (req: Request, res: Response) => {
+    req.session.destroy((err: Error | null) => {
+        if (err) {
+            res.status(500).json({ 
+                success: false, 
+                error: 'Failed to logout' 
+            });
+        } else {
+            res.json({ success: true });
+        }
+    });
+});
 
 // Add logging middleware
 app.use((req, res, next) => {
@@ -74,17 +107,16 @@ app.use((req, res, next) => {
     next();
 });
 
-// Products endpoint
-app.get('/products', (req, res) => {
-  try {
-    const dataPath = path.join(__dirname, 'data', 'data.json');
-    console.log('Reading products from:', dataPath);
-    const products = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
-    res.json(products);
-  } catch (error: any) {
-    console.error('Error reading products:', error);
-    res.status(500).json({ error: 'Failed to load products', details: error.message });
-  }
+// Public routes
+app.get('/products', async (req, res) => {
+    try {
+        const db = getDatabase();
+        const products = await db.getAllProducts();
+        res.json(products);
+    } catch (error: any) {
+        console.error('Error getting products:', error);
+        res.status(500).json({ error: 'Failed to get products' });
+    }
 });
 
 // Health check endpoint
@@ -93,7 +125,7 @@ app.get('/health', (req, res) => {
 });
 
 // Invoice generation endpoint
-app.post('/generate-invoice', async (req, res) => {
+app.post('/generate-invoice', authenticateToken, async (req, res) => {
     try {
         const { customerName, customerAddress, customerEmail, customerPhone, items } = req.body;
 
@@ -315,10 +347,8 @@ app.post('/generate-invoice', async (req, res) => {
         const pdfBuffer = doc.output('arraybuffer');
         res.send(Buffer.from(pdfBuffer));
     } catch (error: any) {
-        res.status(500).json({ 
-            error: 'Error generating invoice',
-            details: error.message
-        });
+        console.error('Error generating invoice:', error);
+        res.status(500).json({ error: 'Failed to generate invoice', details: error.message });
     }
 });
 
