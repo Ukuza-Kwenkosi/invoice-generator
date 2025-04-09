@@ -17,6 +17,11 @@
 /src/frontend/dist
 /src/backend/dist
 
+# Environment variables
+.env
+.env.*
+!.env.example
+
 # Misc
 .DS_Store
 .env.local
