@@ -1,0 +1,37 @@
+{
+  "name": "invoice-generator-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for invoice generator application",
+  "scripts": {
+    "build": "tsc --project tsconfig.json && node build.js",
+    "start": "npx serve deploy/dist -l 3001",
+    "watch": "tsc --project tsconfig.json --watch",
+    "dev": "concurrently \"npm run watch\" \"npm run start\"",
+    "deploy": "npm run build && node deploy.cjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.1692.0",
+    "ejs": "^3.1.10",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/ejs": "^3.1.5",
+    "@types/node": "^20.11.19",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.17",
+    "concurrently": "^8.2.2",
+    "http-server": "^14.1.1",
+    "nodemon": "^3.1.0",
+    "postcss": "^8.4.35",
+    "serve": "^14.2.1",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.1.4"
+  }
+}
