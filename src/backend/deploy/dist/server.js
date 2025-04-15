@@ -10,11 +10,30 @@ const app = express();
 const port = process.env.PORT || 3000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+// Helper function to format currency values
+export function formatCurrency(amount) {
+    // Convert to string and split into whole and decimal parts
+    const [whole, decimal] = amount.toFixed(2).split('.');
+    // Add thousand separators to the whole part
+    const formattedWhole = whole
+        .split('')
+        .reverse()
+        .join('')
+        .match(/.{1,3}/g)
+        ?.join(' ')
+        .split('')
+        .reverse()
+        .join('') || whole;
+    // Only show cents if they are non-zero
+    const formattedAmount = decimal === '00' ? formattedWhole : `${formattedWhole}.${decimal}`;
+    // Return formatted amount with R symbol
+    return `R ${formattedAmount}`;
+}
 // Enable CORS
 app.use(cors({
-    origin: ['http://localhost:3001'],
+    origin: '*', // Allow all origins
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Origin'],
     credentials: true
 }));
 // Increase payload size limit
@@ -43,6 +62,10 @@ app.get('/products', (req, res) => {
 });
 // Health check endpoint
 app.get('/health', (req, res) => {
+    console.log('Health check request received');
+    console.log('Request headers:', req.headers);
+    console.log('Request origin:', req.get('origin'));
+    res.header('Access-Control-Allow-Origin', '*');
     res.json({ status: 'ok' });
 });
 // Invoice generation endpoint
@@ -153,22 +176,23 @@ app.post('/generate-invoice', async (req, res) => {
                 if (!item.name || !item.quantity || !item.price) {
                     throw new Error(`Invalid item data at index ${index}: Missing required fields`);
                 }
-                const total = item.price * item.quantity;
+                // Ensure price is treated as a whole number
+                const price = Math.round(item.price);
+                const total = price * item.quantity;
                 totalAmount += total;
                 const description = `${item.name}${item.description ? ` - ${item.description}` : ''}${item.size ? ` - ${item.size}` : ''}${item.option ? ` - ${item.option}` : ''}`;
-                // Format price with spaces (without R)
-                const formattedPrice = item.price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-                // Format total with spaces (with R)
-                const formattedTotal = total.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+                // Format prices using the new formatCurrency function
+                const formattedPrice = formatCurrency(price).replace('R ', '');
+                const formattedTotal = formatCurrency(total);
                 tableRows.push([
                     description,
                     formattedPrice,
                     item.quantity.toString(),
-                    `R ${formattedTotal}`
+                    formattedTotal
                 ]);
             });
-            // Format total amount with spaces (with R)
-            const formattedTotalAmount = totalAmount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+            // Format total amount using the new formatCurrency function
+            const formattedTotalAmount = formatCurrency(totalAmount);
             doc.autoTable({
                 head: [tableColumn],
                 body: tableRows,
@@ -179,31 +203,32 @@ app.post('/generate-invoice', async (req, res) => {
                     fillColor: [255, 99, 71],
                     textColor: [255, 255, 255],
                     halign: 'center',
-                    fontSize: 10,
+                    fontSize: 8,
                     cellPadding: 2
                 },
                 alternateRowStyles: {
-                    fillColor: [245, 245, 245]
+                    fillColor: [245, 245, 245],
+                    fontSize: 8
                 },
                 foot: [['', '',
-                        { content: 'Total', styles: { halign: 'center', fontSize: 10, cellPadding: 2 } },
-                        { content: `R ${formattedTotalAmount}`, styles: { halign: 'center', fontSize: 10, cellPadding: 2 } }
+                        { content: 'Total', styles: { halign: 'center', fontSize: 8, cellPadding: 2 } },
+                        { content: formattedTotalAmount, styles: { halign: 'center', fontSize: 8, cellPadding: 2 } }
                     ]],
                 footStyles: {
                     fillColor: [255, 99, 71],
                     textColor: [0, 0, 0],
                     fontStyle: 'bold',
-                    fontSize: 10,
+                    fontSize: 8,
                     cellPadding: 2
                 },
                 columnStyles: {
                     0: { cellWidth: 'auto', cellPadding: 2 },
-                    1: { cellWidth: 25, halign: 'center', cellPadding: 4 },
-                    2: { cellWidth: 12, halign: 'center', cellPadding: 4 },
+                    1: { cellWidth: 20, halign: 'center', cellPadding: 4 },
+                    2: { cellWidth: 15, halign: 'center', cellPadding: 4 },
                     3: { cellWidth: 30, halign: 'center', cellPadding: 4 }
                 },
                 styles: {
-                    fontSize: 10,
+                    fontSize: 8,
                     cellPadding: 2
                 }
             });
@@ -216,7 +241,7 @@ app.post('/generate-invoice', async (req, res) => {
             // Add bank details
             doc.setFontSize(10);
             doc.setFont('helvetica', 'bold');
-            doc.text('Banking Details 1', leftMargin, finalY + 37);
+            doc.text('Banking Details', leftMargin, finalY + 37);
             doc.setFont('helvetica', 'normal');
             doc.text('Bank:', leftMargin, finalY + 44);
             doc.text('Account Holder:', leftMargin, finalY + 51);
@@ -235,9 +260,8 @@ app.post('/generate-invoice', async (req, res) => {
             doc.setFont('helvetica', 'normal');
             doc.text('Terms & Conditions:', leftMargin, termsY);
             doc.text('1. This quote is valid for 30 days from the date of issue.', leftMargin, termsY + 5);
-            doc.text('2. Payment terms: 50% deposit required to confirm order.', leftMargin, termsY + 10);
+            doc.text('2. 4. Terms are strictly Nett for payment of a 50% deposit with order and 50% balance prior to collection.', leftMargin, termsY + 10);
             doc.text('3. Delivery time: 2-3 weeks after confirmation of order.', leftMargin, termsY + 15);
-            doc.text('4. Terms are strictly Nett for payment of a 50% deposit with order and 50% balance prior to collection.', leftMargin, termsY + 20);
         }
         catch (error) {
             throw new Error('Failed to add footer details to PDF');
@@ -257,6 +281,9 @@ app.post('/generate-invoice', async (req, res) => {
     }
 });
 // Start the server
-app.listen(Number(port), '0.0.0.0', () => {
-    console.log(`Server is running on port ${port}`);
-});
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(Number(port), '0.0.0.0', () => {
+        console.log(`Server is running on port ${port}`);
+    });
+}
+export { app };

@@ -27,6 +27,13 @@ try {
     // Compile all TypeScript files using tsconfig.json
     await execAsync('tsc -p tsconfig.json', { stdio: 'inherit' });
     console.log('✓ TypeScript compilation completed\n');
+
+    // Remove tests directory from deploy/dist
+    const testsPath = path.join(process.cwd(), 'deploy/dist/tests');
+    if (await fs.access(testsPath).then(() => true).catch(() => false)) {
+        await fs.rm(testsPath, { recursive: true, force: true });
+        console.log('✓ Removed tests directory from deployment\n');
+    }
 } catch (error) {
     console.error('Error compiling TypeScript:', error);
     process.exit(1);
@@ -51,16 +58,24 @@ try {
                 
                 if (entry.isDirectory()) {
                     // Skip node_modules and other unnecessary directories
-                    if (entry.name === 'node_modules' || entry.name === '.git') {
+                    if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'tests') {
                         continue;
                     }
                     
                     // Recursively copy the directory contents
                     await copyNonTsFiles(srcPath, destPath);
                 } else {
-                    // Copy all non-TypeScript files
-                    await fs.copyFile(srcPath, destPath);
-                    console.log(`✓ Copied: ${entry.name}`);
+                    // Skip test files, TypeScript files, and .DS_Store files
+                    if (!entry.name.endsWith('.test.ts') && 
+                        !entry.name.endsWith('.test.js') && 
+                        entry.name !== '.DS_Store') {
+                        // For TypeScript files, store the .js version in deploy structure
+                        const fileName = entry.name.endsWith('.ts') ? 
+                            destPath.replace(/\.ts$/, '.js') : 
+                            destPath;
+                        await fs.copyFile(srcPath, destPath);
+                        console.log(`✓ Copied: ${entry.name}`);
+                    }
                 }
             }
         } catch (error) {
@@ -70,9 +85,10 @@ try {
     }
 
     // Copy data and images directories
-    const dataSrcPath = path.join(srcPath, 'data');
-    const dataDestPath = path.join(deployDistPath, 'data');
-    await copyNonTsFiles(dataSrcPath, dataDestPath);
+    // Skip data directory as it's not needed in deployment
+    // const dataSrcPath = path.join(srcPath, 'data');
+    // const dataDestPath = path.join(deployDistPath, 'data');
+    // await copyNonTsFiles(dataSrcPath, dataDestPath);
 
     const imagesSrcPath = path.join(srcPath, 'images');
     const imagesDestPath = path.join(deployDistPath, 'images');
@@ -135,8 +151,10 @@ try {
                     structure.dirs.push(newRelativePath);
                     await traverse(fullPath, newRelativePath);
                 } else {
-                    // Skip test files and TypeScript files
-                    if (!entry.name.endsWith('.test.ts') && !entry.name.endsWith('.test.js')) {
+                    // Skip test files, TypeScript files, and .DS_Store files
+                    if (!entry.name.endsWith('.test.ts') && 
+                        !entry.name.endsWith('.test.js') && 
+                        entry.name !== '.DS_Store') {
                         // For TypeScript files, store the .js version in deploy structure
                         const fileName = entry.name.endsWith('.ts') ? 
                             newRelativePath.replace(/\.ts$/, '.js') : 

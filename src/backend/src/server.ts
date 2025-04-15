@@ -55,9 +55,9 @@ export function formatCurrency(amount: number): string {
 
 // Enable CORS
 app.use(cors({
-    origin: ['http://localhost:3001'],
+    origin: '*', // Allow all origins
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Origin'],
     credentials: true
 }));
 
@@ -89,6 +89,10 @@ app.get('/products', (req, res) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
+  console.log('Health check request received');
+  console.log('Request headers:', req.headers);
+  console.log('Request origin:', req.get('origin'));
+  res.header('Access-Control-Allow-Origin', '*');
   res.json({ status: 'ok' });
 });
 

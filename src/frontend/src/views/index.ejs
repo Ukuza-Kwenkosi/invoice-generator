@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+    <title>Quote Generator</title>
+    <!-- Add jsPDF library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    <!-- Add our custom CSS -->
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center">Quote Generator</h1>
+        <form id="quoteForm">
+            <div class="step" id="step1">
+                <h2>Step 1: Select Items</h2>
+                <div id="itemSelector"></div>
+                <button type="button" id="nextStep1">Next</button>
+            </div>
+            <div class="step" id="step2" style="display: none;">
+                <h2>Step 2: Customer Details</h2>
+                <div id="customerDetails"></div>
+                <button type="button" id="prevStep2">Previous</button>
+                <button type="submit">Generate Quote</button>
+            </div>
+        </form>
+    </div>
+
+    <footer class="footer">
+        <img 
+            id="companyLogo" 
+            alt="Company Logo" 
+            src="/images/company_logo.png"/>
+    </footer>
+
+    <!-- Load component templates -->
+    <template id="itemSelectorTemplate">
+        <div class="item-selector">
+            <div class="flex">
+                <div class="flex-1">
+                    <label>Product</label>
+                    <select class="product-select form-control">
+                        <option value="">Select a product</option>
+                        <% if (locals.products && products.length > 0) { %>
+                            <% products.forEach(function(product) { %>
+                                <option value="<%= product.id %>"><%= product.name %></option>
+                            <% }); %>
+                        <% } %>
+                    </select>
+                </div>
+                <div class="flex-1 hidden size-control">
+                    <label>Size</label>
+                    <select class="size-select form-control">
+                        <option value="">Select a size</option>
+                    </select>
+                </div>
+                <div class="flex-1 hidden option-control">
+                    <label>Option</label>
+                    <select class="option-select form-control">
+                        <option value="">Select an option</option>
+                    </select>
+                </div>
+                <div class="flex-1 hidden quantity-control">
+                    <label>Quantity</label>
+                    <input type="number" class="quantity-input form-control" min="1" value="1">
+                </div>
+                <div class="flex-1 hidden price-control">
+                    <label>Price</label>
+                    <div class="price-label">R 0</div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="customerDetailsTemplate">
+        <div class="form-group">
+            <div class="flex">
+                <div class="flex-1">
+                    <label for="customerName">Customer Name</label>
+                    <input type="text" id="customerName" name="customerName" class="form-control" required>
+                </div>
+                <div class="flex-1">
+                    <label for="customerEmail">Email</label>
+                    <input type="email" id="customerEmail" name="customerEmail" class="form-control" required>
+                </div>
+            </div>
+            <div class="flex">
+                <div class="flex-1">
+                    <label for="customerPhone">Phone</label>
+                    <input type="tel" id="customerPhone" name="customerPhone" class="form-control" required>
+                </div>
+                <div class="flex-1">
+                    <label for="customerAddress">Address</label>
+                    <input type="text" id="customerAddress" name="customerAddress" class="form-control" required>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Add our custom JavaScript -->
+    <script type="module">
+        import { ItemSelector } from '/js/components/item-selector/item-selector.js';
+        import { CustomerDetails } from '/js/components/customer-details/customer-details.js';
+        import { AuthService } from '/js/services/auth.js';
+        import { ApiService } from '/js/services/api.js';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const itemSelector = new ItemSelector();
+            const customerDetails = new CustomerDetails();
+            const authService = new AuthService();
+            const apiService = new ApiService();
+
+            // Initialize components
+            itemSelector.initialize();
+            customerDetails.initialize();
+
+            // Handle form navigation
+            document.getElementById('nextStep1').addEventListener('click', () => {
+                document.getElementById('step1').style.display = 'none';
+                document.getElementById('step2').style.display = 'block';
+            });
+
+            document.getElementById('prevStep2').addEventListener('click', () => {
+                document.getElementById('step2').style.display = 'none';
+                document.getElementById('step1').style.display = 'block';
+            });
+
+            // Handle form submission
+            document.getElementById('quoteForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const items = itemSelector.getSelectedItems();
+                const customer = customerDetails.getCustomerDetails();
+                
+                try {
+                    const quote = await apiService.generateQuote(items, customer);
+                    // Handle quote generation success
+                } catch (error) {
+                    console.error('Error generating quote:', error);
+                }
+            });
+        });
+    </script>
+</body>
+</html> 

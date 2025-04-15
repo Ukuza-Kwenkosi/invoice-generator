@@ -6,7 +6,8 @@ const fs = require('fs');
 const EC2_KEY_NAME = 'invoice-generator-prod-key.pem';
 const EC2_USERNAME = 'ubuntu';
 const DEPLOYMENT_DIR = '/home/ubuntu/deployments';
-const PUBLIC_IP = '13.246.21.45'; // Your EC2 instance IP
+const PUBLIC_IP = '13.247.89.204'; // Your EC2 instance IP
+const PORT = 3000; // Server port
 
 async function deploy() {
     try {
@@ -51,13 +52,6 @@ async function deploy() {
             }
             console.log('✅ package.json verified');
 
-            // Check if data directory exists
-            const dataDir = path.join(deployDir, 'data');
-            if (!fs.existsSync(dataDir)) {
-                throw new Error('data directory not found in build output');
-            }
-            console.log('✅ data directory verified');
-
             // Check if images directory exists
             const imagesDir = path.join(deployDir, 'images');
             if (!fs.existsSync(imagesDir)) {
@@ -92,11 +86,11 @@ async function deploy() {
         console.log('🛑 Stopping existing server...');
         try {
             // First check if server is running
-            const checkServer = execSync('ssh -i ~/.ssh/invoice-generator-prod-key.pem ubuntu@13.246.21.45 "ps aux | grep \'node server.js\' | grep -v grep"').toString().trim();
+            const checkServer = execSync(`ssh -i ~/.ssh/${EC2_KEY_NAME} ${EC2_USERNAME}@${PUBLIC_IP} "ps aux | grep 'node server.js' | grep -v grep"`).toString().trim();
             if (checkServer) {
                 console.log('Found running server, stopping it...');
                 // Kill the specific server process
-                execSync('ssh -i ~/.ssh/invoice-generator-prod-key.pem ubuntu@13.246.21.45 "sudo kill -9 $(ps aux | grep \'node server.js\' | grep -v grep | awk \'{print $2}\')"');
+                execSync(`ssh -i ~/.ssh/${EC2_KEY_NAME} ${EC2_USERNAME}@${PUBLIC_IP} "sudo kill -9 $(ps aux | grep 'node server.js' | grep -v grep | awk '{print $2}')"`);
                 console.log('✅ Server process killed');
             } else {
                 console.log('✅ No server process found');
@@ -105,17 +99,17 @@ async function deploy() {
             console.log('✅ No server process found');
         }
 
-        // Double check port 3000
+        // Double check port
         try {
-            execSync('ssh -i ~/.ssh/invoice-generator-prod-key.pem ubuntu@13.246.21.45 "sudo fuser -k 3000/tcp"');
-            console.log('✅ Killed any process using port 3000');
+            execSync(`ssh -i ~/.ssh/${EC2_KEY_NAME} ${EC2_USERNAME}@${PUBLIC_IP} "sudo fuser -k ${PORT}/tcp"`);
+            console.log(`✅ Killed any process using port ${PORT}`);
         } catch (error) {
-            console.log('✅ No processes using port 3000');
+            console.log(`✅ No processes using port ${PORT}`);
         }
 
         // Final check - kill any remaining Node.js processes
         try {
-            execSync('ssh -i ~/.ssh/invoice-generator-prod-key.pem ubuntu@13.246.21.45 "sudo pkill -9 -f node"');
+            execSync(`ssh -i ~/.ssh/${EC2_KEY_NAME} ${EC2_USERNAME}@${PUBLIC_IP} "sudo pkill -9 -f node"`);
             console.log('✅ Killed any remaining Node.js processes');
         } catch (error) {
             console.log('✅ No Node.js processes to kill');
@@ -157,6 +151,18 @@ async function deploy() {
         // Deploy on EC2
         console.log('🔄 Deploying on EC2...');
         try {
+            // Check if Node.js is already installed
+            console.log('Checking Node.js installation...');
+            try {
+                const nodeVersion = execSync(`ssh -i ~/.ssh/${EC2_KEY_NAME} ${EC2_USERNAME}@${PUBLIC_IP} "node --version"`).toString().trim();
+                console.log(`✅ Node.js ${nodeVersion} is already installed`);
+            } catch (error) {
+                console.log('Node.js not found, installing...');
+                const installNodeOutput = execSync(`ssh -i ~/.ssh/${EC2_KEY_NAME} ${EC2_USERNAME}@${PUBLIC_IP} "curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash - && sudo apt-get install -y nodejs"`).toString();
+                console.log('Node.js installation output:', installNodeOutput);
+                console.log('✅ Node.js installed successfully');
+            }
+
             console.log('Installing dependencies...');
             const installOutput = execSync(`ssh -i ~/.ssh/${EC2_KEY_NAME} ${EC2_USERNAME}@${PUBLIC_IP} "cd ${DEPLOYMENT_DIR} && npm install --omit=dev"`).toString();
             console.log('Installation output:', installOutput);
@@ -166,49 +172,33 @@ async function deploy() {
             throw error;
         }
         
-        // Start the server
-        console.log('🚀 Starting server...');
+        // Start the server directly
         try {
-            // Create a start script on the server
-            const startScript = `#!/bin/bash
-cd ${DEPLOYMENT_DIR}
-NODE_ENV=production node server.js > server.log 2>&1 &
-echo $! > server.pid
-`;
-            execSync(`ssh -i ~/.ssh/${EC2_KEY_NAME} ${EC2_USERNAME}@${PUBLIC_IP} "echo '${startScript}' > start-server.sh && chmod +x start-server.sh"`);
+            console.log('🚀 Starting server...');
+            execSync(`ssh -i ~/.ssh/${EC2_KEY_NAME} ${EC2_USERNAME}@${PUBLIC_IP} "cd ${DEPLOYMENT_DIR} && NODE_ENV=production PORT=${PORT} nohup node server.js > server.log 2>&1 &"`);
             
-            // Execute the start script
-            execSync(`ssh -i ~/.ssh/${EC2_KEY_NAME} ${EC2_USERNAME}@${PUBLIC_IP} "./start-server.sh"`);
+            // Wait a bit for the server to start
+            console.log('⏳ Waiting for server to start...');
+            execSync('sleep 5');
             
-            console.log('✅ Server started in background');
+            // Check if server is responding
+            const healthCheck = execSync(`ssh -i ~/.ssh/${EC2_KEY_NAME} ${EC2_USERNAME}@${PUBLIC_IP} "curl -s http://localhost:${PORT}/health"`).toString();
+            console.log('Health check response:', healthCheck);
             
-            // Wait for server to be ready
-            console.log('⏳ Waiting for server to be ready...');
-            let attempts = 0;
-            const maxAttempts = 10;
-            let serverReady = false;
-            
-            while (attempts < maxAttempts && !serverReady) {
-                try {
-                    const healthCheck = execSync(`curl -s http://${PUBLIC_IP}:3000/health`).toString();
-                    if (healthCheck.includes('"status":"ok"')) {
-                        serverReady = true;
-                        console.log('✅ Server is responding to health checks');
-                    }
-                } catch (error) {
-                    // Health check failed, wait and try again
-                    execSync('sleep 1');
-                    attempts++;
-                }
+            if (healthCheck.includes('"status":"ok"')) {
+                console.log('✅ Server started successfully');
+            } else {
+                throw new Error('Server health check failed');
             }
-            
-            if (!serverReady) {
-                throw new Error('Server failed to respond to health checks after multiple attempts');
-            }
-            
-            console.log('✅ Deployment completed successfully!');
         } catch (error) {
             console.error('❌ Server failed to start:', error.message);
+            // Get the server log for debugging
+            try {
+                const errorLog = execSync(`ssh -i ~/.ssh/${EC2_KEY_NAME} ${EC2_USERNAME}@${PUBLIC_IP} "cat ${DEPLOYMENT_DIR}/server.log"`).toString();
+                console.log('Server error log:', errorLog);
+            } catch (logError) {
+                console.log('Could not retrieve server log:', logError.message);
+            }
             throw error;
         }
 

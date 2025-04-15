@@ -29,9 +29,9 @@ function compileTypeScript() {
 // Compile EJS templates to HTML
 function compileEjsTemplates() {
     console.log('\n3. Compiling EJS templates to HTML');
-    const publicDir = path.join(__dirname, 'public');
+    const srcDir = path.join(__dirname, 'src');
     const distDir = path.join(__dirname, 'deploy', 'dist');
-    const viewsDir = path.join(publicDir, 'views');
+    const viewsDir = path.join(srcDir, 'views');
     const distViewsDir = path.join(distDir, 'views');
     
     // Create views directory if it doesn't exist
@@ -48,185 +48,170 @@ function compileEjsTemplates() {
             root: viewsDir
         });
         fs.writeFileSync(path.join(distDir, 'index.html'), indexHtml);
-        console.log('✓ Compiled index.ejs -> index.html');
-    } catch (err) {
-        console.error('Error compiling index.ejs:', err);
-        throw err;
+        console.log('✓ Compiled index.ejs to index.html');
+    } catch (error) {
+        console.error('✗ Failed to compile index.ejs:', error);
+        process.exit(1);
     }
-    
-    // Compile other EJS files to HTML
-    console.log('\nCompiling other EJS templates...');
-    fs.readdirSync(viewsDir, { withFileTypes: true })
-        .filter(f => !f.isDirectory() && f.name !== 'index.ejs' && f.name.endsWith('.ejs'))
-        .forEach(file => {
-            try {
-                const ejsPath = path.join(viewsDir, file.name);
-                const ejsContent = fs.readFileSync(ejsPath, 'utf8');
-                const htmlContent = ejs.render(ejsContent, {
-                    filename: ejsPath,
-                    root: viewsDir
-                });
-                const htmlFile = file.name.replace('.ejs', '.html');
-                fs.writeFileSync(path.join(distViewsDir, htmlFile), htmlContent);
-                console.log(`✓ Compiled ${file.name} -> ${htmlFile}`);
-            } catch (err) {
-                console.error(`Error compiling ${file.name}:`, err);
-                throw err;
-            }
-        });
+
+    // Compile other EJS templates
+    const ejsFiles = fs.readdirSync(viewsDir).filter(file => file.endsWith('.ejs') && file !== 'index.ejs');
+    for (const file of ejsFiles) {
+        console.log(`Compiling ${file}...`);
+        try {
+            const ejsContent = fs.readFileSync(path.join(viewsDir, file), 'utf8');
+            const htmlContent = ejs.render(ejsContent, {
+                filename: path.join(viewsDir, file),
+                root: viewsDir
+            });
+            const htmlFileName = file.replace('.ejs', '.html');
+            fs.writeFileSync(path.join(distViewsDir, htmlFileName), htmlContent);
+            console.log(`✓ Compiled ${file} to ${htmlFileName}`);
+        } catch (error) {
+            console.error(`✗ Failed to compile ${file}:`, error);
+            process.exit(1);
+        }
+    }
 }
 
-// Copy static files (excluding EJS files)
+// Copy static files
 function copyStaticFiles() {
     console.log('\n4. Copying static files');
-    const publicDir = path.join(__dirname, 'public');
+    const srcDir = path.join(__dirname, 'src');
     const distDir = path.join(__dirname, 'deploy', 'dist');
     
-    // Copy static assets
-    ['css', 'images'].forEach(dir => {
-        const srcDir = path.join(publicDir, dir);
-        const destDir = path.join(distDir, dir);
+    // Copy CSS files
+    const cssSrcDir = path.join(srcDir, 'css');
+    const cssDistDir = path.join(distDir, 'css');
+    if (fs.existsSync(cssSrcDir)) {
+        fs.mkdirSync(cssDistDir, { recursive: true });
+        const cssFiles = fs.readdirSync(cssSrcDir);
+        for (const file of cssFiles) {
+            fs.copyFileSync(path.join(cssSrcDir, file), path.join(cssDistDir, file));
+        }
+        console.log('✓ Copied CSS files');
+    }
+
+    // Copy JavaScript files
+    const jsSrcDir = path.join(__dirname, 'deploy', 'dist', 'js');
+    const jsDistDir = path.join(distDir, 'js');
+    if (fs.existsSync(jsSrcDir)) {
+        // Create js directory in final dist
+        fs.mkdirSync(jsDistDir, { recursive: true });
         
-        if (fs.existsSync(srcDir)) {
-            if (!fs.existsSync(destDir)) {
-                fs.mkdirSync(destDir, { recursive: true });
+        // Copy all files and directories recursively
+        function copyDir(src, dest) {
+            if (!fs.existsSync(dest)) {
+                fs.mkdirSync(dest, { recursive: true });
             }
             
-            fs.readdirSync(srcDir, { withFileTypes: true })
-                .filter(f => !f.isDirectory())
-                .forEach(file => {
-                    fs.copyFileSync(
-                        path.join(srcDir, file.name),
-                        path.join(destDir, file.name)
-                    );
-                    console.log(`✓ Copied ${dir}/${file.name}`);
-                });
+            const entries = fs.readdirSync(src, { withFileTypes: true });
+            
+            for (const entry of entries) {
+                const srcPath = path.join(src, entry.name);
+                const destPath = path.join(dest, entry.name);
+                
+                if (entry.isDirectory()) {
+                    copyDir(srcPath, destPath);
+                } else {
+                    fs.copyFileSync(srcPath, destPath);
+                }
+            }
         }
-    });
+        
+        copyDir(jsSrcDir, jsDistDir);
+        console.log('✓ Copied JavaScript files');
+    } else {
+        console.error('✗ JavaScript source directory not found:', jsSrcDir);
+        process.exit(1);
+    }
+
+    // Copy image files
+    const imagesSrcDir = path.join(srcDir, 'images');
+    const imagesDistDir = path.join(distDir, 'images');
+    if (fs.existsSync(imagesSrcDir)) {
+        fs.mkdirSync(imagesDistDir, { recursive: true });
+        const imageFiles = fs.readdirSync(imagesSrcDir);
+        for (const file of imageFiles) {
+            fs.copyFileSync(path.join(imagesSrcDir, file), path.join(imagesDistDir, file));
+        }
+        console.log('✓ Copied image files');
+    }
 }
 
-// Validate the build output
+// Validate build
 function validateBuild() {
-    console.log('\n4. Validating build output');
-    const publicDir = path.join(__dirname, 'public');
+    console.log('\n5. Validating build');
+    const srcDir = path.join(__dirname, 'src');
     const distDir = path.join(__dirname, 'deploy', 'dist');
 
-    // Validate directory structure exists
-    console.log('\nValidating directory structure:');
-    ['js', 'views', 'css', 'images'].forEach(dir => {
-        const distDirPath = path.join(distDir, dir);
-        if (!fs.existsSync(distDirPath)) {
-            throw new Error(`Missing directory in dist: ${dir}/`);
-        }
-        console.log(`✓ Directory exists: ${dir}/`);
-    });
-
     // Validate TypeScript compilation
-    console.log('\nValidating TypeScript output:');
     function validateTypeScriptDir(srcDir, distDir, relativePath = '') {
-        const srcFiles = fs.readdirSync(srcDir, { withFileTypes: true });
+        const srcPath = path.join(srcDir, relativePath);
+        const distPath = path.join(distDir, relativePath);
         
-        srcFiles.forEach(entry => {
-            const relativeEntryPath = path.join(relativePath, entry.name);
-            const srcPath = path.join(srcDir, entry.name);
-            const distPath = path.join(distDir, entry.name.replace('.ts', '.js'));
+        if (!fs.existsSync(srcPath)) return;
+        
+        const items = fs.readdirSync(srcPath);
+        for (const item of items) {
+            const itemPath = path.join(relativePath, item);
+            const srcItemPath = path.join(srcDir, itemPath);
+            const distItemPath = path.join(distDir, itemPath);
             
-            if (entry.isDirectory()) {
-                const distSubDir = path.join(distDir, entry.name);
-                if (!fs.existsSync(distSubDir)) {
-                    throw new Error(`Missing compiled directory: ${relativeEntryPath}/`);
+            if (fs.statSync(srcItemPath).isDirectory()) {
+                validateTypeScriptDir(srcDir, distDir, itemPath);
+            } else if (item.endsWith('.ts')) {
+                const jsFile = item.replace('.ts', '.js');
+                const distJsPath = path.join(distDir, 'js', itemPath.replace('.ts', '.js'));
+                if (!fs.existsSync(distJsPath)) {
+                    console.error(`✗ Missing compiled file: ${jsFile}`);
+                    process.exit(1);
                 }
-                console.log(`✓ Directory structure maintained: ${relativeEntryPath}/`);
-                validateTypeScriptDir(srcPath, distSubDir, relativeEntryPath);
-            } else if (entry.name.endsWith('.ts')) {
-                if (!fs.existsSync(distPath)) {
-                    throw new Error(`Missing compiled file: ${relativeEntryPath.replace('.ts', '.js')}`);
-                }
-                console.log(`✓ ${relativeEntryPath} -> ${relativeEntryPath.replace('.ts', '.js')}`);
             }
-        });
-    }
-    validateTypeScriptDir(
-        path.join(publicDir, 'js'),
-        path.join(distDir, 'js')
-    );
-
-    // Validate EJS compilation
-    console.log('\nValidating EJS output:');
-    const viewsDir = path.join(publicDir, 'views');
-    const distViewsDir = path.join(distDir, 'views');
-
-    // First validate index.ejs -> index.html in root
-    const indexEjsPath = path.join(viewsDir, 'index.ejs');
-    const indexHtmlPath = path.join(distDir, 'index.html');
-    if (!fs.existsSync(indexEjsPath)) {
-        throw new Error('Missing source file: views/index.ejs');
-    }
-    if (!fs.existsSync(indexHtmlPath)) {
-        throw new Error('Missing compiled file: index.html in root directory');
-    }
-    console.log('✓ views/index.ejs -> index.html (in root)');
-
-    // Then validate other EJS files in views directory
-    fs.readdirSync(viewsDir, { withFileTypes: true })
-        .filter(f => !f.isDirectory() && f.name !== 'index.ejs' && f.name.endsWith('.ejs'))
-        .forEach(file => {
-            const htmlFile = file.name.replace('.ejs', '.html');
-            const htmlPath = path.join(distViewsDir, htmlFile);
-            if (!fs.existsSync(htmlPath)) {
-                throw new Error(`Missing compiled file: views/${htmlFile}`);
-            }
-            console.log(`✓ views/${file.name} -> views/${htmlFile}`);
-        });
-
-    // Validate static assets
-    console.log('\nValidating static assets:');
-    ['css', 'images'].forEach(dir => {
-        const srcDir = path.join(publicDir, dir);
-        const destDir = path.join(distDir, dir);
-        
-        if (fs.existsSync(srcDir)) {
-            function validateStaticDir(srcPath, destPath, relativePath = '') {
-                fs.readdirSync(srcPath, { withFileTypes: true }).forEach(entry => {
-                    const relativeEntryPath = path.join(relativePath, entry.name);
-                    const srcFilePath = path.join(srcPath, entry.name);
-                    const destFilePath = path.join(destPath, entry.name);
-
-                    if (entry.isDirectory()) {
-                        if (!fs.existsSync(destFilePath)) {
-                            throw new Error(`Missing directory in ${dir}: ${relativeEntryPath}/`);
-                        }
-                        console.log(`✓ Directory structure maintained: ${dir}/${relativeEntryPath}/`);
-                        validateStaticDir(srcFilePath, destFilePath, relativeEntryPath);
-                    } else {
-                        if (!fs.existsSync(destFilePath)) {
-                            throw new Error(`Missing static file: ${dir}/${relativeEntryPath}`);
-                        }
-                        console.log(`✓ ${dir}/${relativeEntryPath} copied`);
-                    }
-                });
-            }
-            validateStaticDir(srcDir, destDir);
         }
-    });
-
-    // Check no source files exist in dist
-    console.log('\nChecking for source files:');
-    function checkNoSourceFiles(dir) {
-        fs.readdirSync(dir, { withFileTypes: true }).forEach(entry => {
-            const fullPath = path.join(dir, entry.name);
-            if (entry.isDirectory()) {
-                checkNoSourceFiles(fullPath);
-            } else if (entry.name.endsWith('.ts') || entry.name.endsWith('.ejs')) {
-                throw new Error(`Found source file in dist: ${fullPath}`);
-            }
-        });
     }
+
+    // Validate static files
+    function validateStaticDir(srcPath, destPath, relativePath = '') {
+        if (!fs.existsSync(srcPath)) return;
+        
+        const items = fs.readdirSync(srcPath);
+        for (const item of items) {
+            const itemSrcPath = path.join(srcPath, item);
+            const itemDestPath = path.join(destPath, item);
+            const itemRelativePath = path.join(relativePath, item);
+            
+            if (fs.statSync(itemSrcPath).isDirectory()) {
+                validateStaticDir(itemSrcPath, itemDestPath, itemRelativePath);
+            } else if (!fs.existsSync(itemDestPath)) {
+                console.error(`✗ Missing static file: ${itemRelativePath}`);
+                process.exit(1);
+            }
+        }
+    }
+
+    // Check for source files in dist
+    function checkNoSourceFiles(dir) {
+        const items = fs.readdirSync(dir);
+        for (const item of items) {
+            const itemPath = path.join(dir, item);
+            if (fs.statSync(itemPath).isDirectory()) {
+                checkNoSourceFiles(itemPath);
+            } else if (item.endsWith('.ts')) {
+                console.error(`✗ Source file found in dist: ${itemPath}`);
+                process.exit(1);
+            }
+        }
+    }
+
+    validateTypeScriptDir(path.join(srcDir, 'js'), distDir);
+    validateStaticDir(path.join(srcDir, 'css'), path.join(distDir, 'css'));
+    validateStaticDir(path.join(srcDir, 'images'), path.join(distDir, 'images'));
     checkNoSourceFiles(distDir);
-    console.log('✓ No source files found in dist');
+    
+    console.log('✓ Build validation completed');
 }
 
-// Main build function
 async function build() {
     try {
         cleanDeploy();
@@ -234,18 +219,11 @@ async function build() {
         compileEjsTemplates();
         copyStaticFiles();
         validateBuild();
-        console.log('\n✓ Build completed successfully');
-    } catch (err) {
-        console.error('\n✗ Build failed:', err);
+        console.log('\nBuild completed successfully!');
+    } catch (error) {
+        console.error('Build failed:', error);
         process.exit(1);
     }
 }
 
-// Run build process
-try {
-    console.log('\n=== Starting Build Process ===');
-    build();
-} catch (error) {
-    console.error('\n✗ Build failed:', error.message);
-    process.exit(1);
-} 
+build(); 

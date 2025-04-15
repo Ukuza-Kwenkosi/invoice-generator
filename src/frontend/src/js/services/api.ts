@@ -1,8 +1,42 @@
-import { getApiUrl } from '../config.js';
-import { InvoiceData, LoginCredentials, ApiResponse } from '../models/types.js';
+import { getApiUrl } from '../config';
+
+// Types
+interface Product {
+    id: string;
+    name: string;
+    price: number;
+    sizes: string[];
+    description?: string;
+}
+
+interface LoginCredentials {
+    username: string;
+    password: string;
+}
+
+interface ApiResponse {
+    success: boolean;
+    error?: string;
+}
+
+interface InvoiceData {
+    customerName: string;
+    customerAddress: string;
+    customerEmail: string;
+    customerPhone: string;
+    date: string;
+    invoiceNumber: string;
+    items: Array<{
+        name: string;
+        quantity: number;
+        price: number;
+        size?: string;
+        option?: string;
+    }>;
+}
 
 class ApiService {
-    async getProducts(): Promise<any[]> {
+    async getProducts(): Promise<Product[]> {
         try {
             const response = await fetch(getApiUrl('/products'));
             if (!response.ok) {
@@ -55,30 +89,32 @@ class ApiService {
                 body: JSON.stringify(invoiceData),
                 credentials: 'include'
             });
-            
+
             if (!response.ok) {
                 // Try to get detailed error message from response
                 const errorData = await response.json();
                 const errorMessage = errorData.details || errorData.error || 'Failed to generate invoice';
-                const error = new Error(errorMessage);
-                (error as any).details = errorData;  // Attach full error data
+                const error = new Error(errorMessage) as Error & { details?: unknown };
+                error.details = errorData; // Attach full error data
                 throw error;
             }
-            
+
             // Check if response is PDF
             const contentType = response.headers.get('content-type');
             if (!contentType || !contentType.includes('application/pdf')) {
                 throw new Error('Invalid response format - expected PDF');
             }
-            
+
             return await response.blob();
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error creating invoice:', error);
             // Include any additional error details in the error message
-            const details = error.details ? `\nDetails: ${JSON.stringify(error.details, null, 2)}` : '';
-            throw new Error(`${error.message}${details}`);
+            const details = (error as { details?: unknown }).details 
+                ? `\nDetails: ${JSON.stringify((error as { details: unknown }).details, null, 2)}` 
+                : '';
+            throw new Error(`${error instanceof Error ? error.message : 'Unknown error'}${details}`);
         }
     }
 }
 
-export const apiService = new ApiService();
+export const apiService = new ApiService(); 
