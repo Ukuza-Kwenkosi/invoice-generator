@@ -14,30 +14,31 @@
                 <h1 class="text-5xl font-bold">Backoffice</h1>
             </div>
             <div class="card flex-shrink-0 w-full max-w-sm shadow-2xl bg-base-100">
-                <form class="card-body" action="/login" method="POST">
-                    <% if (typeof messages !== 'undefined' && messages && messages.error) { %>
-                        <div class="alert alert-error">
-                            <span><%= messages.error %></span>
+                <form id="loginForm" class="card-body">
+                    <% if (locals.error) { %>
+                        <div id="errorMessage" class="alert alert-error mb-4">
+                            <span id="errorText"><%= error %></span>
                         </div>
                     <% } %>
                     <div class="form-control">
                         <label class="label">
                             <span class="label-text">Username</span>
                         </label>
-                        <input type="text" name="username" class="input input-bordered" required />
+                        <input type="text" id="username" name="username" class="input input-bordered" required />
                     </div>
                     <div class="form-control">
                         <label class="label">
                             <span class="label-text">Password</span>
                         </label>
-                        <input type="password" name="password" class="input input-bordered" required />
+                        <input type="password" id="password" name="password" class="input input-bordered" required />
                     </div>
                     <div class="form-control mt-6">
-                        <button class="btn btn-primary">Login</button>
+                        <button type="submit" class="btn btn-primary">Login</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+    <script type="module" src="/js/components/Login.js"></script>
 </body>
 </html> 

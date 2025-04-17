@@ -9,16 +9,16 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "outDir": "deploy/dist/js",
-    "rootDir": "public/js",
+    "rootDir": "src/js",
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["public/js/*"]
+      "@/*": ["src/js/*"]
     }
   },
-  "include": ["public/js/**/*"],
+  "include": ["src/js/**/*"],
   "exclude": ["node_modules"]
 }

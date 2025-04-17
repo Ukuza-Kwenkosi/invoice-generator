@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backoffice</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.7.2/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://unpkg.com/@heroicons/react@2.1.1/24/outline"></script>
+</head>
+<body class="min-h-screen bg-base-200">
+    <div class="navbar bg-base-100 shadow-lg">
+        <div class="flex-1">
+            <a class="btn btn-ghost text-xl">Backoffice</a>
+        </div>
+        <div class="flex-none">
+            <form action="/logout" method="POST">
+                <button class="btn btn-ghost" title="Logout">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="container mx-auto p-4">
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title">Product Management</h2>
+                <div class="overflow-x-auto">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Product Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (locals.products && products.length > 0) { %>
+                                <% products.forEach(function(product) { %>
+                                    <tr>
+                                        <td>
+                                            <div class="flex justify-between items-center">
+                                                <div>
+                                                    <h3 class="font-bold"><%= product.name %></h3>
+                                                    <p class="text-sm text-gray-500"><%= product.description %></p>
+                                                    <div class="mt-2">
+                                                        <% if (product.sizes && product.sizes.length > 0) { %>
+                                                            <% product.sizes.forEach(function(size) { %>
+                                                                <span class="badge badge-primary mr-2">
+                                                                    <%= size.size %> - R<%= size.price %>
+                                                                </span>
+                                                            <% }); %>
+                                                        <% } %>
+                                                    </div>
+                                                </div>
+                                                <button class="btn btn-ghost" onclick="editProduct('<%= product.name %>')" title="Edit">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            <% } else { %>
+                                <tr>
+                                    <td class="text-center py-8">
+                                        <div class="text-gray-500">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12 mx-auto mb-4">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                                            </svg>
+                                            <p>No products available</p>
+                                            <button class="btn btn-primary mt-4" onclick="showAddProductModal()">Add Your First Product</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-actions justify-end mt-4">
+                    <button class="btn btn-primary" onclick="showAddProductModal()" title="Add New Product">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Product Modal -->
+    <dialog id="productModal" class="modal">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg" id="modalTitle">Add New Product</h3>
+            <form id="productForm" onsubmit="handleSubmit(event)">
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Name</span>
+                    </label>
+                    <input type="text" name="name" class="input input-bordered" required />
+                </div>
+                <div class="form-control">
+                    <div class="grid grid-cols-[1fr_120px_50px] gap-4">
+                        <div>
+                            <label class="label">
+                                <span class="label-text">Size</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="label">
+                                <span class="label-text">Price</span>
+                            </label>
+                        </div>
+                        <div></div>
+                    </div>
+                    <div id="sizesContainer" class="space-y-2">
+                        <!-- Sizes will be added here dynamically -->
+                    </div>
+                    <div class="flex justify-end mt-2">
+                        <button type="button" class="btn btn-primary" onclick="addSize()" title="Add Size">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Options (comma-separated)</span>
+                    </label>
+                    <input type="text" name="options" class="input input-bordered" />
+                </div>
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Description</span>
+                    </label>
+                    <textarea name="description" class="textarea textarea-bordered"></textarea>
+                </div>
+                <div class="modal-action">
+                    <button type="submit" class="btn btn-primary" title="Save">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </button>
+                    <button type="button" class="btn" onclick="closeModal()" title="Cancel">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </dialog>
+
+    <script type="module" src="/js/components/Backoffice.js"></script>
+</body>
+</html> 
