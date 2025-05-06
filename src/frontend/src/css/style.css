@@ -33,6 +33,7 @@ body {
 }
 
 /* Utility Classes */
+/* IMPORTANT: We ONLY use .hidden for visibility control */
 .hidden {
     display: none !important;
 }
@@ -95,6 +96,31 @@ body {
     margin-bottom: 0.75rem;
 }
 
+/* Customer Details */
+.customer-details {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.customer-details .form-group {
+    margin-bottom: 1rem;
+}
+
+.customer-details label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.customer-details input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    font-size: var(--font-size-base);
+}
+
 /* Labels */
 label {
     display: block;
@@ -149,6 +175,14 @@ textarea:focus {
     min-width: 200px;
 }
 
+.item-selector .justify-end {
+    justify-content: flex-end;
+}
+
+.item-selector .mt-4 {
+    margin-top: var(--spacing-lg);
+}
+
 /* Price Control */
 .price-control {
     width: 100%;
@@ -161,6 +195,17 @@ textarea:focus {
     font-weight: 600;
     font-size: var(--font-size-lg);
     color: var(--text-color);
+}
+
+/* Button Group */
+.button-group {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-lg);
+    width: 100%;
+    position: relative;
+    z-index: 1;
 }
 
 /* Buttons */
@@ -176,11 +221,14 @@ button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    position: relative;
+    z-index: 2;
 }
 
 .btn-primary {
     background-color: var(--primary-color);
     color: white;
+    opacity: 1;
 }
 
 .btn-primary:hover {
@@ -196,14 +244,6 @@ button {
 .btn-secondary:hover {
     background-color: #5a6268;
     transform: translateY(-1px);
-}
-
-/* Button Group */
-.button-group {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--spacing-sm);
-    margin-top: var(--spacing-lg);
 }
 
 /* Remove Item Button */

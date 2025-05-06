@@ -1,14 +1,7 @@
 import { getApiUrl } from '../config';
+import { Product } from '../models/types';
 
 // Types
-interface Product {
-    id: string;
-    name: string;
-    price: number;
-    sizes: string[];
-    description?: string;
-}
-
 interface LoginCredentials {
     username: string;
     password: string;

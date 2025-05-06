@@ -1,229 +1,178 @@
-const fs = require('fs');
-const path = require('path');
-const ejs = require('ejs');
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, readdirSync, rmSync, existsSync } from 'fs';
+import { join, dirname, basename } from 'path';
+import { fileURLToPath } from 'url';
+import ejs from 'ejs';
+import { execSync } from 'child_process';
 
-// Clean deploy directory
-function cleanDeploy() {
-    console.log('\n1. Cleaning deploy directory');
-    const deployDir = path.join(__dirname, 'deploy');
-    if (fs.existsSync(deployDir)) {
-        fs.rmSync(deployDir, { recursive: true, force: true });
-        console.log('✓ Removed existing deploy directory');
-    }
-    fs.mkdirSync(path.join(deployDir, 'dist'), { recursive: true });
-    console.log('✓ Created fresh deploy/dist directory');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const isWatchMode = process.argv.includes('--watch');
+
+// Directory paths
+const srcDir = join(__dirname, 'src');
+const viewsDir = join(srcDir, 'views');
+const deployDir = join(__dirname, 'deploy');
+const distDir = join(deployDir, 'dist');
+
+// Clean and prepare dist directory
+if (existsSync(deployDir)) {
+  rmSync(deployDir, { recursive: true });
+}
+mkdirSync(deployDir, { recursive: true });
+mkdirSync(distDir, { recursive: true });
+mkdirSync(join(distDir, 'css'), { recursive: true });
+mkdirSync(join(distDir, 'images'), { recursive: true });
+mkdirSync(join(distDir, 'js'), { recursive: true });
+
+// Bundle TypeScript files using esbuild
+function bundleTypeScript() {
+  try {
+    console.log('Bundling TypeScript files...');
+    execSync('npm run build:js', { stdio: 'inherit' });
+    console.log('TypeScript bundling completed successfully!');
+  } catch (error) {
+    console.error('Error bundling TypeScript files:', error);
+    process.exit(1);
+  }
 }
 
-// Compile TypeScript files
-function compileTypeScript() {
-    console.log('\n2. Compiling TypeScript');
-    try {
-        require('child_process').execSync('tsc --project tsconfig.json', { stdio: 'inherit' });
-        console.log('✓ TypeScript compilation completed');
-    } catch (error) {
-        console.error('✗ TypeScript compilation failed:', error);
-        process.exit(1);
-    }
-}
+// Process EJS templates
+function processTemplates() {
+  // Process main templates from views directory
+  const viewsDir = join(srcDir, 'views');
+  const ejsFiles = readdirSync(viewsDir).filter(file => file.endsWith('.ejs'));
+  
+  for (const file of ejsFiles) {
+    const filePath = join(viewsDir, file);
+    const content = readFileSync(filePath, 'utf-8');
+    const html = ejs.render(content, {}, {
+      filename: filePath,
+      root: [srcDir],
+      views: [srcDir]
+    });
+    
+    const outputPath = join(distDir, file.replace('.ejs', '.html'));
+    writeFileSync(outputPath, html);
+    console.log(`Processed: ${file} -> ${basename(outputPath)}`);
+  }
 
-// Compile EJS templates to HTML
-function compileEjsTemplates() {
-    console.log('\n3. Compiling EJS templates to HTML');
-    const srcDir = path.join(__dirname, 'src');
-    const distDir = path.join(__dirname, 'deploy', 'dist');
-    const viewsDir = path.join(srcDir, 'views');
-    const distViewsDir = path.join(distDir, 'views');
-    
-    // Create views directory if it doesn't exist
-    if (!fs.existsSync(distViewsDir)) {
-        fs.mkdirSync(distViewsDir, { recursive: true });
-    }
-    
-    // Compile index.ejs to root index.html
-    console.log('Compiling index.ejs to root index.html...');
-    try {
-        const indexEjs = fs.readFileSync(path.join(viewsDir, 'index.ejs'), 'utf8');
-        const indexHtml = ejs.render(indexEjs, {
-            filename: path.join(viewsDir, 'index.ejs'),
-            root: viewsDir
+  // Process component templates from js/components directory
+  const componentsDir = join(srcDir, 'js', 'components');
+  if (existsSync(componentsDir)) {
+    const componentDirs = readdirSync(componentsDir, { withFileTypes: true })
+      .filter(dirent => dirent.isDirectory())
+      .map(dirent => dirent.name);
+
+    for (const componentDir of componentDirs) {
+      const componentPath = join(componentsDir, componentDir);
+      const componentFiles = readdirSync(componentPath)
+        .filter(file => file.endsWith('.ejs'));
+
+      for (const file of componentFiles) {
+        const filePath = join(componentPath, file);
+        const content = readFileSync(filePath, 'utf-8');
+        const html = ejs.render(content, {}, {
+          filename: filePath,
+          root: [srcDir],
+          views: [srcDir]
         });
-        fs.writeFileSync(path.join(distDir, 'index.html'), indexHtml);
-        console.log('✓ Compiled index.ejs to index.html');
-    } catch (error) {
-        console.error('✗ Failed to compile index.ejs:', error);
-        process.exit(1);
-    }
 
-    // Compile other EJS templates
-    const ejsFiles = fs.readdirSync(viewsDir).filter(file => file.endsWith('.ejs') && file !== 'index.ejs');
-    for (const file of ejsFiles) {
-        console.log(`Compiling ${file}...`);
-        try {
-            const ejsContent = fs.readFileSync(path.join(viewsDir, file), 'utf8');
-            const htmlContent = ejs.render(ejsContent, {
-                filename: path.join(viewsDir, file),
-                root: viewsDir
-            });
-            const htmlFileName = file.replace('.ejs', '.html');
-            fs.writeFileSync(path.join(distViewsDir, htmlFileName), htmlContent);
-            console.log(`✓ Compiled ${file} to ${htmlFileName}`);
-        } catch (error) {
-            console.error(`✗ Failed to compile ${file}:`, error);
-            process.exit(1);
+        // Create component directory in dist if it doesn't exist
+        const componentDistDir = join(distDir, 'js', 'components', componentDir);
+        if (!existsSync(componentDistDir)) {
+          mkdirSync(componentDistDir, { recursive: true });
         }
+
+        const outputPath = join(componentDistDir, file.replace('.ejs', '.html'));
+        writeFileSync(outputPath, html);
+        console.log(`Processed component: ${componentDir}/${file} -> ${basename(outputPath)}`);
+      }
     }
+  }
 }
 
 // Copy static files
 function copyStaticFiles() {
-    console.log('\n4. Copying static files');
-    const srcDir = path.join(__dirname, 'src');
-    const distDir = path.join(__dirname, 'deploy', 'dist');
-    
-    // Copy CSS files
-    const cssSrcDir = path.join(srcDir, 'css');
-    const cssDistDir = path.join(distDir, 'css');
-    if (fs.existsSync(cssSrcDir)) {
-        fs.mkdirSync(cssDistDir, { recursive: true });
-        const cssFiles = fs.readdirSync(cssSrcDir);
-        for (const file of cssFiles) {
-            fs.copyFileSync(path.join(cssSrcDir, file), path.join(cssDistDir, file));
-        }
-        console.log('✓ Copied CSS files');
+  // Copy CSS files
+  const cssDir = join(srcDir, 'css');
+  if (existsSync(cssDir)) {
+    const cssFiles = readdirSync(cssDir);
+    for (const file of cssFiles) {
+      copyFileSync(join(cssDir, file), join(distDir, 'css', file));
+      console.log(`Copied: css/${file}`);
+    }
+  }
+
+  // Copy images
+  const imagesDir = join(srcDir, 'images');
+  if (existsSync(imagesDir)) {
+    const imageFiles = readdirSync(imagesDir);
+    for (const file of imageFiles) {
+      copyFileSync(join(imagesDir, file), join(distDir, 'images', file));
+      console.log(`Copied: images/${file}`);
     }
 
-    // Copy JavaScript files
-    const jsSrcDir = path.join(__dirname, 'deploy', 'dist', 'js');
-    const jsDistDir = path.join(distDir, 'js');
-    if (fs.existsSync(jsSrcDir)) {
-        // Create js directory in final dist
-        fs.mkdirSync(jsDistDir, { recursive: true });
-        
-        // Copy all files and directories recursively
-        function copyDir(src, dest) {
-            if (!fs.existsSync(dest)) {
-                fs.mkdirSync(dest, { recursive: true });
-            }
-            
-            const entries = fs.readdirSync(src, { withFileTypes: true });
-            
-            for (const entry of entries) {
-                const srcPath = path.join(src, entry.name);
-                const destPath = path.join(dest, entry.name);
-                
-                if (entry.isDirectory()) {
-                    copyDir(srcPath, destPath);
-                } else {
-                    fs.copyFileSync(srcPath, destPath);
-                }
-            }
-        }
-        
-        copyDir(jsSrcDir, jsDistDir);
-        console.log('✓ Copied JavaScript files');
-    } else {
-        console.error('✗ JavaScript source directory not found:', jsSrcDir);
-        process.exit(1);
+    // Copy favicon from images directory
+    const faviconPath = join(imagesDir, 'favicon.ico');
+    if (existsSync(faviconPath)) {
+      copyFileSync(faviconPath, join(distDir, 'favicon.ico'));
+      console.log('Copied: favicon.ico');
     }
-
-    // Copy image files
-    const imagesSrcDir = path.join(srcDir, 'images');
-    const imagesDistDir = path.join(distDir, 'images');
-    if (fs.existsSync(imagesSrcDir)) {
-        fs.mkdirSync(imagesDistDir, { recursive: true });
-        const imageFiles = fs.readdirSync(imagesSrcDir);
-        for (const file of imageFiles) {
-            fs.copyFileSync(path.join(imagesSrcDir, file), path.join(imagesDistDir, file));
-        }
-        console.log('✓ Copied image files');
-    }
+  }
 }
 
-// Validate build
-function validateBuild() {
-    console.log('\n5. Validating build');
-    const srcDir = path.join(__dirname, 'src');
-    const distDir = path.join(__dirname, 'deploy', 'dist');
+// Initial build
+bundleTypeScript();
+processTemplates();
+copyStaticFiles();
+console.log('Build completed successfully!');
 
-    // Validate TypeScript compilation
-    function validateTypeScriptDir(srcDir, distDir, relativePath = '') {
-        const srcPath = path.join(srcDir, relativePath);
-        const distPath = path.join(distDir, relativePath);
-        
-        if (!fs.existsSync(srcPath)) return;
-        
-        const items = fs.readdirSync(srcPath);
-        for (const item of items) {
-            const itemPath = path.join(relativePath, item);
-            const srcItemPath = path.join(srcDir, itemPath);
-            const distItemPath = path.join(distDir, itemPath);
-            
-            if (fs.statSync(srcItemPath).isDirectory()) {
-                validateTypeScriptDir(srcDir, distDir, itemPath);
-            } else if (item.endsWith('.ts')) {
-                const jsFile = item.replace('.ts', '.js');
-                const distJsPath = path.join(distDir, 'js', itemPath.replace('.ts', '.js'));
-                if (!fs.existsSync(distJsPath)) {
-                    console.error(`✗ Missing compiled file: ${jsFile}`);
-                    process.exit(1);
-                }
-            }
+// Watch mode
+if (isWatchMode) {
+  console.log('Watching for changes...');
+  import('fs').then(({ watch }) => {
+    // Watch templates
+    watch(viewsDir, { recursive: true }, (eventType, filename) => {
+      if (filename && filename.endsWith('.ejs')) {
+        console.log(`Change detected in ${filename}, rebuilding...`);
+        processTemplates();
+      }
+    });
+
+    // Watch CSS files
+    const cssDir = join(srcDir, 'css');
+    if (existsSync(cssDir)) {
+      watch(cssDir, { recursive: true }, (eventType, filename) => {
+        if (filename) {
+          console.log(`Change detected in css/${filename}, copying...`);
+          copyFileSync(join(cssDir, filename), join(distDir, 'css', filename));
         }
+      });
     }
 
-    // Validate static files
-    function validateStaticDir(srcPath, destPath, relativePath = '') {
-        if (!fs.existsSync(srcPath)) return;
-        
-        const items = fs.readdirSync(srcPath);
-        for (const item of items) {
-            const itemSrcPath = path.join(srcPath, item);
-            const itemDestPath = path.join(destPath, item);
-            const itemRelativePath = path.join(relativePath, item);
-            
-            if (fs.statSync(itemSrcPath).isDirectory()) {
-                validateStaticDir(itemSrcPath, itemDestPath, itemRelativePath);
-            } else if (!fs.existsSync(itemDestPath)) {
-                console.error(`✗ Missing static file: ${itemRelativePath}`);
-                process.exit(1);
-            }
+    // Watch images
+    const imagesDir = join(srcDir, 'images');
+    if (existsSync(imagesDir)) {
+      watch(imagesDir, { recursive: true }, (eventType, filename) => {
+        if (filename) {
+          console.log(`Change detected in images/${filename}, copying...`);
+          copyFileSync(join(imagesDir, filename), join(distDir, 'images', filename));
+          // If the changed file is favicon.ico, also copy it to root
+          if (filename === 'favicon.ico') {
+            copyFileSync(join(imagesDir, filename), join(distDir, filename));
+          }
         }
+      });
     }
 
-    // Check for source files in dist
-    function checkNoSourceFiles(dir) {
-        const items = fs.readdirSync(dir);
-        for (const item of items) {
-            const itemPath = path.join(dir, item);
-            if (fs.statSync(itemPath).isDirectory()) {
-                checkNoSourceFiles(itemPath);
-            } else if (item.endsWith('.ts')) {
-                console.error(`✗ Source file found in dist: ${itemPath}`);
-                process.exit(1);
-            }
+    // Watch TypeScript files
+    const tsDir = join(srcDir, 'js');
+    if (existsSync(tsDir)) {
+      watch(tsDir, { recursive: true }, (eventType, filename) => {
+        if (filename && filename.endsWith('.ts')) {
+          console.log(`Change detected in js/${filename}, rebuilding...`);
+          bundleTypeScript();
         }
+      });
     }
-
-    validateTypeScriptDir(path.join(srcDir, 'js'), distDir);
-    validateStaticDir(path.join(srcDir, 'css'), path.join(distDir, 'css'));
-    validateStaticDir(path.join(srcDir, 'images'), path.join(distDir, 'images'));
-    checkNoSourceFiles(distDir);
-    
-    console.log('✓ Build validation completed');
-}
-
-async function build() {
-    try {
-        cleanDeploy();
-        compileTypeScript();
-        compileEjsTemplates();
-        copyStaticFiles();
-        validateBuild();
-        console.log('\nBuild completed successfully!');
-    } catch (error) {
-        console.error('Build failed:', error);
-        process.exit(1);
-    }
-}
-
-build(); 
+  });
+} 

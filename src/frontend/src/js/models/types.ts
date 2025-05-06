@@ -1,8 +1,11 @@
 export interface Product {
     name: string;
-    description?: string;
-    sizes: Size[];
+    sizes: Array<{
+        size: string;
+        price: number;
+    }>;
     options?: string[];
+    description?: string;
 }
 
 export interface Size {
@@ -26,7 +29,8 @@ export interface CustomerDetails {
 export interface SelectedItem {
     name: string;
     size: string;
-    option?: string;
     quantity: number;
     price: number;
+    option?: string;
+    description?: string;
 } 

@@ -26,6 +26,7 @@ interface InvoiceData {
 declare global {
     interface Window {
         selectedItems: InvoiceItem[];
+        itemSelector: ItemSelectorComponent;
     }
 }
 
@@ -46,23 +47,28 @@ function preloadLogo(): void {
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log('DOM Content Loaded');
     if (!window.location.pathname.includes('login')) {
+        console.log('Not on login page, initializing components');
         preloadLogo();
-        initializeEventListeners();
-
-        // Initialize item selector
+        
+        // Initialize components
         const itemsContainer = document.getElementById('itemsContainer');
+        console.log('Items container found:', itemsContainer);
         if (itemsContainer) {
-            const itemSelector = new ItemSelectorComponent();
-            itemsContainer.appendChild(itemSelector.getElement());
+            console.log('Creating ItemSelectorComponent');
+            window.itemSelector = new ItemSelectorComponent();
+            console.log('ItemSelectorComponent created');
         }
 
         // Initialize customer details
         const customerDetailsContainer = document.getElementById('customerDetailsContainer');
         if (customerDetailsContainer) {
             customerDetailsComponent = new CustomerDetailsComponent();
-            customerDetailsContainer.appendChild(customerDetailsComponent.getElement());
         }
+
+        // Initialize event listeners
+        initializeEventListeners();
     } else {
         const authService = new AuthService();
         const loginForm = document.getElementById('loginForm');
@@ -73,43 +79,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function initializeEventListeners(): void {
-    const addItemBtn = document.getElementById('addItemBtn');
-    if (addItemBtn) {
-        addItemBtn.addEventListener('click', () => {
-            const container = document.getElementById('itemsContainer');
-            if (!container) return;
-            
-            const itemSelector = new ItemSelectorComponent();
-            container.appendChild(itemSelector.getElement());
-        });
-        addItemBtn.style.display = 'none'; // Hide by default
-    }
-
-    const nextBtn = document.getElementById('nextBtn');
+    // Handle navigation between steps
     const backBtn = document.getElementById('backBtn');
     const step1 = document.getElementById('step1');
     const step2 = document.getElementById('step2');
 
-    if (nextBtn && backBtn && step1 && step2) {
-        nextBtn.style.display = 'none'; // Hide by default
-        nextBtn.addEventListener('click', () => {
-            step1.classList.add('hidden');
-            step2.classList.remove('hidden');
-        });
+    if (backBtn && step1 && step2) {
         backBtn.addEventListener('click', () => {
             step2.classList.add('hidden');
             step1.classList.remove('hidden');
         });
     }
-
-    document.addEventListener('productSelected', () => {
-        const addItemBtn = document.getElementById('addItemBtn');
-        const nextBtn = document.getElementById('nextBtn');
-        if (addItemBtn && nextBtn) {
-            addItemBtn.style.display = 'block';
-            nextBtn.style.display = 'block';
-        }
-    });
 
     // Handle form submission
     const invoiceForm = document.getElementById('invoiceForm');
@@ -145,11 +125,5 @@ function initializeEventListeners(): void {
 
         invoiceForm.addEventListener('submit', handleSubmit);
         generateInvoiceBtn.addEventListener('click', handleSubmit);
-    }
-
-    const authService = new AuthService();
-    const loginForm = document.getElementById('loginForm');
-    if (loginForm) {
-        loginForm.addEventListener('submit', (event) => authService.handleLogin(event));
     }
 } 

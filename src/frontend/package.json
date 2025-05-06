@@ -1,13 +1,17 @@
 {
   "name": "invoice-generator-frontend",
   "version": "1.0.0",
-  "description": "Frontend for invoice generator application",
+  "type": "module",
+  "description": "Frontend for Invoice Generator Application",
   "scripts": {
-    "build": "tsc --project tsconfig.json && node build.js",
-    "start": "npx serve deploy/dist --config serve.json",
-    "watch": "tsc --project tsconfig.json --watch",
-    "dev": "concurrently \"npm run watch\" \"npm run start\"",
-    "deploy": "npm run build && node deploy.cjs"
+    "build:js": "esbuild src/js/script.ts --bundle --outfile=deploy/dist/js/script.js --format=esm --sourcemap --alias:@=./src/js",
+    "build:html": "node build.js",
+    "build": "npm run build:html && npm run build:js",
+    "watch:js": "esbuild src/js/script.ts --bundle --outfile=deploy/dist/js/script.js --format=esm --sourcemap --alias:@=./src/js --watch",
+    "watch:html": "node build.js --watch",
+    "watch": "concurrently \"npm run watch:html\" \"npm run watch:js\"",
+    "start": "http-server deploy/dist -p 3001 --cors",
+    "dev": "concurrently \"npm run watch\" \"npm run start\""
   },
   "keywords": [],
   "author": "",
@@ -17,15 +21,10 @@
     "ejs": "^3.1.10"
   },
   "devDependencies": {
-    "@types/ejs": "^3.1.5",
     "@types/node": "^20.11.19",
-    "autoprefixer": "^10.4.17",
     "concurrently": "^8.2.2",
+    "esbuild": "^0.20.2",
     "http-server": "^14.1.1",
-    "nodemon": "^3.1.0",
-    "postcss": "^8.4.35",
-    "serve": "^14.2.1",
-    "tailwindcss": "^3.4.1",
     "typescript": "^5.3.3"
   }
 }
