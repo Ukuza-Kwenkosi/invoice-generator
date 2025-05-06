@@ -1,5 +1,9 @@
 # Deploy folder
 deploy/
+deploy/dist/
+deploy/dist/images/
+deploy/dist/package.json
+deploy/dist/server.js
 
 # Dependencies
 node_modules/

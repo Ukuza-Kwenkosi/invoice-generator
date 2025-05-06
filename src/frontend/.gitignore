@@ -1,5 +1,10 @@
 # Deploy folder
 deploy/
+deploy/dist/
+deploy/dist/js/
+deploy/dist/css/
+deploy/dist/images/
+deploy/dist/views/
 
 # Dependencies
 node_modules/

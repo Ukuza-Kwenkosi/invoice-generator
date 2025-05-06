@@ -55,3 +55,5 @@ coverage/
 *.js
 !src/backend/server.js
 !src/backend/deploy.cjs
+src/backend/deploy/dist/package.json
+src/backend/deploy/dist/server.js
