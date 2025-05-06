@@ -1,8 +1,12 @@
-# Root level deploy folder
+# Deploy folder
 deploy/
 
 # Dependencies
 node_modules/
+
+# Build output
+dist/
+build/
 
 # Environment files
 .env
@@ -25,6 +29,13 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# TypeScript
+*.tsbuildinfo
+
+# Coverage
+coverage/
+.nyc_output/
+
 # Temporary files
 *.tmp
 *.temp
@@ -40,18 +51,7 @@ yarn-error.log*
 ehthumbs.db
 Thumbs.db
 
-# Build output
-dist/
-build/
-
-# TypeScript
-*.tsbuildinfo
-
-# Coverage
-coverage/
-.nyc_output/
-
 # JavaScript files
 *.js
-!src/backend/server.js
-!src/backend/deploy.cjs
+!server.js
+!deploy.cjs 
