@@ -5,9 +5,7 @@ import { DynamoDatabase } from './dynamodb';
 
 export class DatabaseFactory {
     static getDatabase(): Database {
-        if (process.env.NODE_ENV === 'production') {
-            return Container.get(DynamoDatabase);
-        }
+        // Always use FileDatabase for now
         return Container.get(FileDatabase);
     }
 } 

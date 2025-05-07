@@ -1,14 +1,7 @@
 import { getApiUrl } from '../config';
+import { Product } from '../models/types';
 
 // Types
-interface Product {
-    id: string;
-    name: string;
-    price: number;
-    sizes: string[];
-    description?: string;
-}
-
 interface LoginCredentials {
     username: string;
     password: string;
@@ -17,6 +10,9 @@ interface LoginCredentials {
 interface ApiResponse {
     success: boolean;
     error?: string;
+    data?: {
+        token?: string;
+    };
 }
 
 interface InvoiceData {
@@ -49,6 +45,59 @@ class ApiService {
         }
     }
 
+    async getProduct(name: string): Promise<Product> {
+        try {
+            const response = await fetch(getApiUrl(`/products/${encodeURIComponent(name)}`));
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error fetching product:', error);
+            throw error;
+        }
+    }
+
+    async createProduct(product: Omit<Product, 'id'>): Promise<Product> {
+        try {
+            const response = await fetch(getApiUrl('/products'), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(product),
+                credentials: 'include'
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error creating product:', error);
+            throw error;
+        }
+    }
+
+    async updateProduct(name: string, product: Omit<Product, 'id'>): Promise<Product> {
+        try {
+            const response = await fetch(getApiUrl(`/products/${encodeURIComponent(name)}`), {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(product),
+                credentials: 'include'
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error updating product:', error);
+            throw error;
+        }
+    }
+
     async login(credentials: LoginCredentials): Promise<ApiResponse> {
         try {
             const response = await fetch(getApiUrl('/auth/login'), {
@@ -59,7 +108,12 @@ class ApiService {
                 body: JSON.stringify(credentials),
                 credentials: 'include'
             });
-            return await response.json();
+            const data = await response.json();
+            if (data.success) {
+                // Store authentication state
+                localStorage.setItem('isAuthenticated', 'true');
+            }
+            return data;
         } catch (error) {
             console.error('Login error:', error);
             return { success: false, error: 'Network error during login' };
@@ -72,7 +126,12 @@ class ApiService {
                 method: 'POST',
                 credentials: 'include'
             });
-            return await response.json();
+            const data = await response.json();
+            if (data.success) {
+                // Clear authentication state
+                localStorage.removeItem('isAuthenticated');
+            }
+            return data;
         } catch (error) {
             console.error('Logout error:', error);
             return { success: false, error: 'Network error during logout' };

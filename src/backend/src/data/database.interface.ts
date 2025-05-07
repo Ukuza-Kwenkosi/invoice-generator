@@ -14,5 +14,6 @@ export interface Product {
 
 export interface Database {
     getAllProducts(): Promise<Product[]>;
+    updateProduct(name: string, product: Omit<Product, 'id'>): Promise<void>;
     // Add other methods as needed
 } 

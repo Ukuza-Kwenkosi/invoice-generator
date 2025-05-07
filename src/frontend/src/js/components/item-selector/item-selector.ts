@@ -8,221 +8,263 @@ export class ItemSelectorComponent {
     private selectedSize: Size | null = null;
     private selectedOption: string | null = null;
     private quantity: number = 1;
+    private nextButton: HTMLElement | null = null;
+    private selectedItems: SelectedItem[] = [];
 
     constructor() {
-        const template = document.getElementById('itemSelectorTemplate') as HTMLTemplateElement;
-        if (!template) {
+        // Get the container where the template is included
+        const container = document.getElementById('itemsContainer');
+        if (!container) {
+            throw new Error('Items container not found');
+        }
+        
+        // Use the first child of the container as our element
+        this.element = container.firstElementChild as HTMLElement;
+        if (!this.element) {
             throw new Error('Item selector template not found');
         }
-        const content = template.content.cloneNode(true) as DocumentFragment;
-        this.element = content.firstElementChild as HTMLElement;
-        this.loadProducts();
+
+        // Get the next button
+        this.nextButton = document.getElementById('nextBtn');
+        if (this.nextButton) {
+            this.nextButton.classList.add('hidden');
+        }
+        
+        // Hide all controls initially
+        this.toggleControls(false);
+        
+        this.initializeComponent();
+    }
+
+    private updateCartCount(): void {
+        const countElement = document.querySelector('.cart-count');
+        if (countElement) {
+            countElement.textContent = this.selectedItems.length.toString();
+        }
+    }
+
+    private async initializeComponent(): Promise<void> {
+        await this.loadProducts();
+        this.updateProductOptions();
+        this.initializeEventListeners();
     }
 
     private async loadProducts(): Promise<void> {
         try {
-            const apiProducts = await apiService.getProducts();
-            this.products = apiProducts.map(product => ({
-                name: product.name,
-                description: product.description,
-                sizes: product.sizes.map(size => ({
-                    size,
-                    price: product.price,
-                    options: []
-                })),
-                options: []
-            }));
-            const productSelect = this.element.querySelector('.product-select');
-            if (productSelect) {
-                const productOptions = this.products
-                    .map(product => `<option value="${product.name}">${product.name}</option>`)
-                    .join('');
-                productSelect.innerHTML = '<option value="">Select a product</option>' + productOptions;
-            }
-            this.initializeEventListeners();
+            this.products = await apiService.getProducts();
         } catch (error) {
             console.error('Error loading products:', error);
             this.products = [];
         }
     }
 
-    private initializeEventListeners(): void {
+    private updateProductOptions(): void {
         const productSelect = this.element.querySelector('.product-select') as HTMLSelectElement;
-        const sizeSelect = this.element.querySelector('.size-select') as HTMLSelectElement;
-        const optionSelect = this.element.querySelector('.option-select') as HTMLSelectElement;
+        if (!productSelect) return;
+
+        // Clear existing options
+        productSelect.innerHTML = '';
+        
+        // Add placeholder option
+        const placeholderOption = document.createElement('option');
+        placeholderOption.value = '';
+        placeholderOption.textContent = 'Select a product';
+        placeholderOption.disabled = true;
+        placeholderOption.selected = true;
+        productSelect.appendChild(placeholderOption);
+
+        // Add product options
+        this.products.forEach(product => {
+            const option = document.createElement('option');
+            option.value = product.name;
+            option.textContent = product.name;
+            productSelect.appendChild(option);
+        });
+
+        // Add change event listener
+        productSelect.addEventListener('change', () => this.handleProductChange(productSelect));
+    }
+
+    private initializeEventListeners(): void {
+        console.log('Initializing event listeners...');
+        
+        // Add event listener for quantity input
         const quantityInput = this.element.querySelector('.quantity-input') as HTMLInputElement;
-
-        if (!productSelect || !sizeSelect || !optionSelect || !quantityInput) {
-            console.error('Required elements not found in template');
-            return;
+        if (quantityInput) {
+            quantityInput.addEventListener('change', () => this.handleQuantityChange(quantityInput));
         }
 
-        // Remove any existing event listeners
-        productSelect.replaceWith(productSelect.cloneNode(true));
-        sizeSelect.replaceWith(sizeSelect.cloneNode(true));
-        optionSelect.replaceWith(optionSelect.cloneNode(true));
-        quantityInput.replaceWith(quantityInput.cloneNode(true));
+        // Add event listener for size select
+        const sizeSelect = this.element.querySelector('.size-select') as HTMLSelectElement;
+        if (sizeSelect) {
+            sizeSelect.addEventListener('change', () => this.handleSizeChange(sizeSelect));
+        }
 
-        // Get fresh references to the elements
-        const newProductSelect = this.element.querySelector('.product-select') as HTMLSelectElement;
-        const newSizeSelect = this.element.querySelector('.size-select') as HTMLSelectElement;
-        const newOptionSelect = this.element.querySelector('.option-select') as HTMLSelectElement;
-        const newQuantityInput = this.element.querySelector('.quantity-input') as HTMLInputElement;
+        // Add event listener for option select
+        const optionSelect = this.element.querySelector('.option-select') as HTMLSelectElement;
+        if (optionSelect) {
+            optionSelect.addEventListener('change', () => this.handleOptionChange(optionSelect));
+        }
 
-        // Add event listeners
-        newProductSelect.addEventListener('change', () => this.handleProductChange(newProductSelect.value));
-        newSizeSelect.addEventListener('change', () => this.handleSizeChange(newSizeSelect.value));
-        newOptionSelect.addEventListener('change', () => this.handleOptionChange(newOptionSelect.value));
-        newQuantityInput.addEventListener('change', () => this.handleQuantityChange(parseInt(newQuantityInput.value)));
-    }
+        // Add event listener for add item button
+        const addItemButton = this.element.querySelector('.add-item-btn') as HTMLButtonElement;
+        console.log('Add item button found:', addItemButton);
+        if (addItemButton) {
+            addItemButton.addEventListener('click', () => {
+                console.log('Add item button clicked');
+                this.handleAddItem();
+            });
+        }
 
-    private handleProductChange(productName: string): void {
-        this.selectedProduct = this.products.find(p => p.name === productName) || null;
-        this.selectedSize = null;
-        this.selectedOption = null;
-        this.updateSizeOptions();
-        this.updateOptionOptions();
-        this.updatePrice();
-
-        if (this.selectedProduct) {
-            document.dispatchEvent(new Event('productSelected'));
+        // Add event listener for next button
+        if (this.nextButton) {
+            this.nextButton.addEventListener('click', () => {
+                const step1 = document.getElementById('step1');
+                const step2 = document.getElementById('step2');
+                if (step1 && step2) {
+                    step1.classList.add('hidden');
+                    step2.classList.remove('hidden');
+                }
+            });
         }
     }
 
-    private handleSizeChange(sizeValue: string): void {
-        if (this.selectedProduct) {
-            this.selectedSize = this.selectedProduct.sizes.find(s => s.size === sizeValue) || null;
-            this.updatePrice();
+    private toggleControls(show: boolean): void {
+        const controls = [
+            '.size-control',
+            '.option-control',
+            '.quantity-control',
+            '.price-control',
+            '.add-item-control'
+        ];
 
-            const productSelect = this.element.querySelector('.product-select') as HTMLSelectElement;
-            const sizeSelect = this.element.querySelector('.size-select') as HTMLSelectElement;
-            const optionSelect = this.element.querySelector('.option-select') as HTMLSelectElement;
-            const quantityInput = this.element.querySelector('.quantity-input') as HTMLInputElement;
-
-            if (productSelect.value && sizeSelect.value && this.selectedSize) {
-                const existingItem = (window as any).selectedItems.find(
-                    (item: SelectedItem) => item.name === productSelect.value && item.size === sizeSelect.value
-                );
-
-                if (existingItem) {
-                    existingItem.price = this.selectedSize.price;
+        controls.forEach(control => {
+            const element = this.element.querySelector(control);
+            if (element) {
+                if (show) {
+                    element.classList.remove('hidden');
                 } else {
-                    (window as any).selectedItems.push({
-                        name: productSelect.value,
-                        size: sizeSelect.value,
-                        option: optionSelect.value || undefined,
-                        quantity: parseInt(quantityInput.value) || 1,
-                        price: this.selectedSize.price
+                    element.classList.add('hidden');
+                }
+            }
+        });
+    }
+
+    private updatePrice(): void {
+        const priceLabel = this.element.querySelector('.price-label');
+        if (!priceLabel || !this.selectedSize) return;
+
+        const price = this.selectedSize.price * this.quantity;
+        priceLabel.textContent = `R ${price.toFixed(2)}`;
+    }
+
+    public handleProductChange(select: HTMLSelectElement): void {
+        // Hide all controls initially
+        this.toggleControls(false);
+
+        // If no product selected, return
+        if (!select.value) return;
+
+        this.selectedProduct = this.products.find(p => p.name === select.value) || null;
+        if (!this.selectedProduct) return;
+
+        const sizeSelect = this.element.querySelector('.size-select') as HTMLSelectElement;
+        if (sizeSelect && this.selectedProduct.sizes.length) {
+            // Clear and add size options
+            sizeSelect.innerHTML = '';
+            this.selectedProduct.sizes.forEach(size => {
+                const option = document.createElement('option');
+                option.value = size.size;
+                option.textContent = `${size.size} - R ${size.price.toFixed(2)}`;
+                option.dataset.rawPrice = size.price.toString();
+                sizeSelect.appendChild(option);
+            });
+
+            // Show all controls
+            this.toggleControls(true);
+
+            // Auto-select first size
+            sizeSelect.value = this.selectedProduct.sizes[0].size;
+            this.handleSizeChange(sizeSelect);
+
+            // Show options if product has options
+            if (this.selectedProduct.options?.length) {
+                const optionSelect = this.element.querySelector('.option-select') as HTMLSelectElement;
+                if (optionSelect) {
+                    // Clear existing options
+                    optionSelect.innerHTML = '';
+
+                    // Add option options
+                    this.selectedProduct.options.forEach(option => {
+                        const optionElement = document.createElement('option');
+                        optionElement.value = option;
+                        optionElement.textContent = option;
+                        optionSelect.appendChild(optionElement);
                     });
+
+                    // Show option control
+                    const optionControl = this.element.querySelector('.option-control');
+                    if (optionControl) {
+                        optionControl.classList.remove('hidden');
+                    }
                 }
             }
         }
     }
 
-    private handleOptionChange(optionValue: string): void {
-        this.selectedOption = optionValue || null;
+    public handleSizeChange(select: HTMLSelectElement): void {
+        if (!this.selectedProduct) return;
+
+        this.selectedSize = this.selectedProduct.sizes.find(s => s.size === select.value) || null;
+        if (!this.selectedSize) return;
+
         this.updatePrice();
     }
 
-    private handleQuantityChange(newQuantity: number): void {
-        this.quantity = newQuantity;
-        this.updatePrice();
+    public handleOptionChange(select: HTMLSelectElement): void {
+        this.selectedOption = select.value || null;
+    }
 
+    public handleQuantityChange(input: HTMLInputElement): void {
+        this.quantity = parseInt(input.value);
+        this.updatePrice();
+    }
+
+    public handleAddItem(): void {
+        if (!this.selectedProduct || !this.selectedSize) return;
+
+        const item: SelectedItem = {
+            name: this.selectedProduct.name,
+            size: this.selectedSize.size,
+            quantity: this.quantity,
+            price: this.selectedSize.price,
+            option: this.selectedOption || undefined,
+            description: this.selectedProduct.description
+        };
+
+        this.selectedItems.push(item);
+        window.selectedItems = this.selectedItems;
+        this.updateCartCount();
+
+        // Show the next button after adding an item
+        if (this.nextButton) {
+            this.nextButton.classList.remove('hidden');
+        }
+
+        // Reset form
         const productSelect = this.element.querySelector('.product-select') as HTMLSelectElement;
-        const sizeSelect = this.element.querySelector('.size-select') as HTMLSelectElement;
-
-        if (productSelect.value && sizeSelect.value && this.selectedSize) {
-            const existingItem = (window as any).selectedItems.find(
-                (item: SelectedItem) => item.name === productSelect.value && item.size === sizeSelect.value
-            );
-
-            if (existingItem) {
-                existingItem.quantity = newQuantity;
-            }
+        if (productSelect) {
+            productSelect.value = '';
+            this.selectedProduct = null;
+            this.selectedSize = null;
+            this.selectedOption = null;
+            this.quantity = 1;
+            this.toggleControls(false);
         }
     }
 
-    private updateSizeOptions(): void {
-        const sizeSelect = this.element.querySelector('.size-select') as HTMLSelectElement;
-        const sizeControl = this.element.querySelector('.size-control') as HTMLElement;
-        const optionControl = this.element.querySelector('.option-control') as HTMLElement;
-        const quantityControl = this.element.querySelector('.quantity-control') as HTMLElement;
-        const priceControl = this.element.querySelector('.price-control') as HTMLElement;
-
-        if (!sizeSelect || !sizeControl || !optionControl || !quantityControl || !priceControl) {
-            console.error('Required elements not found for size options');
-            return;
-        }
-
-        sizeSelect.innerHTML = '<option value="">Select a size</option>';
-        sizeControl.classList.add('hidden');
-        optionControl.classList.add('hidden');
-        quantityControl.classList.add('hidden');
-        priceControl.classList.add('hidden');
-
-        if (this.selectedProduct && this.selectedProduct.sizes.length > 0) {
-            sizeControl.classList.remove('hidden');
-            quantityControl.classList.remove('hidden');
-            priceControl.classList.remove('hidden');
-
-            this.selectedProduct.sizes.forEach((size) => {
-                const option = document.createElement('option');
-                option.value = size.size;
-                const formattedPrice = size.price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-                option.textContent = `${size.size} - R ${formattedPrice}`;
-                option.dataset.rawPrice = size.price.toString();
-                sizeSelect.appendChild(option);
-            });
-
-            sizeSelect.value = this.selectedProduct.sizes[0].size;
-            this.handleSizeChange(this.selectedProduct.sizes[0].size);
-        }
-    }
-
-    private updateOptionOptions(): void {
-        const optionSelect = this.element.querySelector('.option-select') as HTMLSelectElement;
-        const optionControl = this.element.querySelector('.option-control') as HTMLElement;
-
-        if (!optionSelect || !optionControl) {
-            console.error('Required elements not found for option options');
-            return;
-        }
-
-        optionSelect.innerHTML = '<option value="">Select an option</option>';
-        optionControl.classList.add('hidden');
-
-        if (this.selectedProduct && this.selectedProduct.options && this.selectedProduct.options.length > 0) {
-            optionControl.classList.remove('hidden');
-            this.selectedProduct.options.forEach((option) => {
-                const optionElement = document.createElement('option');
-                optionElement.value = option;
-                optionElement.textContent = option;
-                optionSelect.appendChild(optionElement);
-            });
-
-            optionSelect.value = this.selectedProduct.options[0];
-            this.handleOptionChange(this.selectedProduct.options[0]);
-        }
-    }
-
-    private updatePrice(): void {
-        const priceLabel = this.element.querySelector('.price-label');
-        if (!priceLabel) {
-            console.error('Price label element not found');
-            return;
-        }
-
-        let totalPrice = 0;
-        if (this.selectedSize) {
-            totalPrice = this.selectedSize.price * this.quantity;
-            if (this.selectedOption && this.selectedSize.options) {
-                const optionPrice = this.selectedSize.options.find(opt => opt.name === this.selectedOption)?.price || 0;
-                totalPrice += optionPrice * this.quantity;
-            }
-        }
-
-        const formattedPrice = totalPrice.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-        priceLabel.textContent = `R ${formattedPrice}`;
+    public getSelectedItems(): SelectedItem[] {
+        return this.selectedItems;
     }
 
     public getElement(): HTMLElement {

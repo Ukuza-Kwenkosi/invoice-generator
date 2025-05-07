@@ -1,0 +1,38 @@
+<div class="item-selector">
+    <div class="flex">
+        <div class="flex-1">
+            <label>Product</label>
+            <select class="product-select form-control">
+                <option value="">Select a product</option>
+            </select>
+        </div>
+        <div class="flex-1 size-control hidden">
+            <label>Size</label>
+            <select class="size-select form-control">
+                <option value="">Select a size</option>
+            </select>
+        </div>
+        <div class="flex-1 option-control hidden">
+            <label>Option</label>
+            <select class="option-select form-control">
+                <option value="">Select an option</option>
+            </select>
+        </div>
+        <div class="flex-1 quantity-control hidden">
+            <label>Quantity</label>
+            <input type="number" class="quantity-input form-control" min="1" value="1">
+        </div>
+        <div class="flex-1 price-control hidden">
+            <label>Price</label>
+            <div class="price-label">R 0</div>
+        </div>
+        <div class="flex-1 add-item-control hidden">
+            <label>&nbsp;</label>
+            <button type="button" class="btn-primary add-item-btn">Add Item</button>
+        </div>
+    </div>
+    <div class="flex justify-end mt-4">
+        <!-- IMPORTANT: This button uses ONLY the hidden class for visibility -->
+        <button type="button" id="nextBtn" class="btn-primary hidden" data-visibility-class="hidden">Next</button>
+    </div>
+</div> 

@@ -1,18 +1,26 @@
-# TypeScript build output
-dist/
-build/
+# Deploy folder
+deploy/
+deploy/dist/
+deploy/dist/js/
+deploy/dist/css/
+deploy/dist/images/
+deploy/dist/views/
 
 # Dependencies
 node_modules/
 
-# Environment variables
+# Build output
+dist/
+build/
+
+# Environment files
 .env
 .env.local
 .env.*.local
 
 # IDE files
-.vscode/
 .idea/
+.vscode/
 *.swp
 *.swo
 
@@ -26,8 +34,24 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Optional npm cache directory
-.npm
+# TypeScript
+*.tsbuildinfo
 
-# Optional eslint cache
-.eslintcache 
+# Coverage
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+.tmp/
+
+# System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db 

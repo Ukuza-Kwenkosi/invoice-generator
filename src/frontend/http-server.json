@@ -1,0 +1,12 @@
+{
+  "root": "deploy/dist",
+  "port": 3001,
+  "cors": true,
+  "cache": 0,
+  "ext": "html",
+  "headers": {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization"
+  }
+} 

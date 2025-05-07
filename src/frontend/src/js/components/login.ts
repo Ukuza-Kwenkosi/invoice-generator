@@ -1,3 +1,6 @@
+import { getApiUrl } from '../config';
+import { apiService } from '../services/api';
+
 interface LoginResponse {
   success: boolean;
   data?: {
@@ -41,23 +44,16 @@ class LoginComponent {
     const password = this.passwordInput.value;
 
     try {
-      const response = await fetch('/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password })
-      });
+      const response = await apiService.login({ username, password });
 
-      const data: LoginResponse = await response.json();
-
-      if (data.success && data.data?.token) {
+      if (response.success) {
         // Store the token
-        localStorage.setItem('token', data.data.token);
-        // Redirect to dashboard
-        window.location.href = '/dashboard';
+        localStorage.setItem('token', response.data?.token || '');
+        // Redirect to backoffice
+        const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        window.location.href = isDevelopment ? '/backoffice' : '/backoffice.html';
       } else {
-        this.showError(data.error || 'Login failed');
+        this.showError(response.error || 'Login failed');
       }
     } catch (error) {
       this.showError('An error occurred during login');

@@ -5,15 +5,29 @@ import path from 'path';
 import fs from 'fs';
 import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
-import session from 'express-session';
-import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import { DatabaseFactory } from './data/database.factory';
-import { AuthService } from './auth/authService';
-import { authenticateToken } from './auth/middleware';
 import { formatCurrency } from './utils/formatting';
 import { logInvoiceGeneration } from './utils/logger';
+import { config } from 'dotenv';
+import { Database } from './data/database.interface';
+import { FileDatabase } from './data/file-db';
+import { DynamoDatabase } from './data/dynamodb';
+
+// Extend express-session types
+declare module 'express-session' {
+  interface SessionData {
+    isAuthenticated: boolean;
+  }
+}
+
+// Augment jsPDF type to include autoTable
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => any;
+  }
+}
 
 // Get database instance
 const getDatabase = () => DatabaseFactory.getDatabase();
@@ -21,43 +35,33 @@ const getDatabase = () => DatabaseFactory.getDatabase();
 // Load environment variables
 dotenv.config();
 
-// Extend express-session types
-declare module 'express-session' {
-    interface SessionData {
-        isAuthenticated: boolean;
-    }
-}
-
-// Augment jsPDF type to include autoTable
-declare module 'jspdf' {
-    interface jsPDF {
-        autoTable: (options: any) => any;
-    }
-}
-
+// Create Express app
 const app = express();
 const port = process.env.PORT || 3000;
 
 // Configure rate limiting
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'), // limit each IP to 100 requests per windowMs
     message: 'Too many requests from this IP, please try again later'
 });
 
 // Apply rate limiting to all routes
 app.use(limiter);
 
-// Session configuration
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'default-secret-key',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
-    }
+// Enable CORS
+app.use(cors({
+    origin: [process.env.CORS_ORIGIN || 'http://localhost:3001', 'https://dctxoovo0tr3t.cloudfront.net'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+    credentials: true
 }));
+
+// Serve static files from the images directory
+app.use('/images', express.static(path.join(__dirname, 'images')));
+
+// Increase payload size limit
+app.use(express.json({ limit: '10mb' }));
 
 // Types
 interface InvoiceItem {
@@ -69,47 +73,30 @@ interface InvoiceItem {
     option?: string;
 }
 
-// Enable CORS
-app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
-}));
-
-// Serve static files from the images directory
-app.use('/images', express.static(path.join(__dirname, 'images')));
-
-// Increase payload size limit
-app.use(express.json({ limit: '10mb' }));
-
 // Authentication middleware
-const isAuthenticated = (req: Request, res: Response, next: NextFunction): void => {
-    if (req.session.isAuthenticated) {
-        next();
-    } else {
-        res.status(401).json({ success: false, error: 'Not authenticated' });
+const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+    const apiKey = req.headers['x-api-key'];
+    if (!apiKey || apiKey !== process.env.ADMIN_PASSWORD) {
+        return res.status(401).json({ success: false, error: 'Invalid API key' });
     }
+    next();
 };
 
 // Login endpoint
-app.post('/auth/login', async (req: Request, res: Response) => {
-    const response = await AuthService.login(req.body);
-    res.status(response.success ? 200 : 401).json(response);
+app.post('/auth/login', (req, res) => {
+    const { username, password } = req.body;
+    
+    if (username === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD) {
+        // Return the API key (which is the admin password in this case)
+        res.json({ success: true, apiKey: process.env.ADMIN_PASSWORD });
+    } else {
+        res.status(401).json({ success: false, error: 'Invalid credentials' });
+    }
 });
 
-// Logout endpoint
-app.post('/auth/logout', (req: Request, res: Response) => {
-    req.session.destroy((err: Error | null) => {
-        if (err) {
-            res.status(500).json({ 
-                success: false, 
-                error: 'Failed to logout' 
-            });
-        } else {
-            res.json({ success: true });
-        }
-    });
+// Logout endpoint (client will handle API key removal)
+app.post('/auth/logout', (_req, res) => {
+    res.json({ success: true });
 });
 
 // Add logging middleware
@@ -131,6 +118,28 @@ app.get('/products', async (req, res) => {
     } catch (error: any) {
         console.error('Error getting products:', error);
         res.status(500).json({ error: 'Failed to get products' });
+    }
+});
+
+// Update product endpoint
+app.put('/products/:name', requireAuth, async (req, res) => {
+    try {
+        const { name } = req.params;
+        const productData = req.body;
+        console.log('Updating product:', name);
+        console.log('Product data:', productData);
+        
+        const db = getDatabase();
+        console.log('Database instance:', db);
+        
+        // Update the product in the database
+        await db.updateProduct(name, productData);
+        console.log('Product updated successfully');
+        
+        res.json({ success: true });
+    } catch (error: any) {
+        console.error('Error updating product:', error);
+        res.status(500).json({ error: 'Failed to update product' });
     }
 });
 

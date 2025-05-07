@@ -19,6 +19,7 @@
     "@types/dotenv": "^6.1.1",
     "@types/jsonwebtoken": "^9.0.9",
     "bcryptjs": "^2.4.3",
+    "connect-redis": "^8.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.0.3",
     "express": "^4.18.2",
@@ -27,6 +28,7 @@
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.5.28",
+    "redis": "^5.0.1",
     "reflect-metadata": "^0.1.13",
     "typedi": "^0.10.0",
     "winston": "^3.17.0"
