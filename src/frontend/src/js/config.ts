@@ -11,7 +11,7 @@ declare const __API_BASE_URL__: string;
 
 // API Configuration
 export const API_CONFIG: ApiConfig = {
-    baseUrl: isDevelopment ? 'http://localhost:3000' : 'https://dctxoovo0tr3t.cloudfront.net'
+    baseUrl: isDevelopment ? 'http://localhost:3000' : 'http://13.247.89.204:3000'
 };
 
 // Get the appropriate API URL based on environment
