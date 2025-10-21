@@ -3,10 +3,12 @@ import { Product, Size } from '../../models/types';
 
 export class BackofficeComponent {
     private modal: HTMLDialogElement | null;
+    private deleteConfirmModal: HTMLDialogElement | null;
     private form: HTMLFormElement | null;
     private sizesContainer: HTMLElement | null;
     private productsTable: HTMLElement | null;
     private editingProduct: Product | null = null;
+    private productToDelete: string | null = null;
     private products: Product[] = [];
     private templates: {
         productList: HTMLTemplateElement;
@@ -17,6 +19,7 @@ export class BackofficeComponent {
 
     constructor() {
         this.modal = document.getElementById('productModal') as HTMLDialogElement;
+        this.deleteConfirmModal = document.getElementById('deleteConfirmModal') as HTMLDialogElement;
         this.form = document.getElementById('productForm') as HTMLFormElement;
         this.sizesContainer = document.getElementById('sizesContainer');
         this.productsTable = document.querySelector('table tbody');
@@ -52,6 +55,30 @@ export class BackofficeComponent {
         const addFirstProductBtn = document.getElementById('addFirstProductBtn');
         if (addFirstProductBtn) {
             addFirstProductBtn.addEventListener('click', () => this.showAddProductModal());
+        }
+
+        // Add main "Add Product" button listener
+        const addProductBtn = document.getElementById('addProductBtn');
+        console.log('Add Product button element:', addProductBtn);
+        if (addProductBtn) {
+            console.log('Adding click listener to Add Product button');
+            addProductBtn.addEventListener('click', () => {
+                console.log('Add Product button clicked!');
+                this.showAddProductModal();
+            });
+        } else {
+            console.error('Add Product button not found!');
+        }
+
+        // Delete confirmation modal buttons
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+        if (confirmDeleteBtn) {
+            confirmDeleteBtn.addEventListener('click', () => this.confirmDelete());
+        }
+
+        const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+        if (cancelDeleteBtn) {
+            cancelDeleteBtn.addEventListener('click', () => this.cancelDelete());
         }
 
         // Load initial data
@@ -93,6 +120,12 @@ export class BackofficeComponent {
                 if (editButton) {
                     editButton.setAttribute('data-product-name', product.name);
                     editButton.addEventListener('click', () => this.editProduct(product.name));
+                }
+                
+                const deleteButton = productRow.querySelector('.delete-product-btn');
+                if (deleteButton) {
+                    deleteButton.setAttribute('data-product-name', product.name);
+                    deleteButton.addEventListener('click', () => this.deleteProduct(product.name));
                 }
                 
                 this.productsTable.appendChild(productRow);
@@ -184,6 +217,43 @@ export class BackofficeComponent {
             });
         }
         this.sizesContainer.appendChild(sizeRow);
+    }
+
+    public deleteProduct(productName: string): void {
+        this.productToDelete = productName;
+        
+        // Update the modal with product name
+        const productNameSpan = document.getElementById('deleteProductName');
+        if (productNameSpan) {
+            productNameSpan.textContent = productName;
+        }
+        
+        // Show the confirmation modal
+        if (this.deleteConfirmModal) {
+            this.deleteConfirmModal.showModal();
+        }
+    }
+
+    private async confirmDelete(): Promise<void> {
+        if (!this.productToDelete) return;
+
+        try {
+            await apiService.deleteProduct(this.productToDelete);
+            await this.loadProducts(); // Reload the products list
+            console.log('Product deleted successfully');
+            this.cancelDelete();
+        } catch (error) {
+            console.error('Error deleting product:', error);
+            alert('Failed to delete product. Please try again.');
+            this.cancelDelete();
+        }
+    }
+
+    private cancelDelete(): void {
+        this.productToDelete = null;
+        if (this.deleteConfirmModal) {
+            this.deleteConfirmModal.close();
+        }
     }
 
     public editProduct(productName: string): void {

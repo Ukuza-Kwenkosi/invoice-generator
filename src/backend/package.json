@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "serverless offline start",
     "deploy": "serverless deploy",
-    "test": "jest"
+    "test": "jest",
+    "import-products": "ts-node scripts/import-products.ts"
   },
   "keywords": [],
   "author": "",
