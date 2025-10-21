@@ -108,7 +108,27 @@ export const generate: APIGatewayProxyHandlerV2 = async (event) => {
 
     // Add company logo
     try {
-      const logoPath = path.join(__dirname, '../images', 'company_logo.png');
+      // Try multiple possible paths for the logo
+      const possiblePaths = [
+        path.join(__dirname, '../images', 'company_logo.png'), // Bundled location
+        path.join(__dirname, 'images', 'company_logo.png'),     // Alternative bundled location
+        path.join(process.cwd(), 'src/images', 'company_logo.png'), // Source location
+        path.join(process.cwd(), 'images', 'company_logo.png'),     // Lambda root
+      ];
+      
+      let logoPath: string | null = null;
+      for (const testPath of possiblePaths) {
+        if (fs.existsSync(testPath)) {
+          logoPath = testPath;
+          break;
+        }
+      }
+      
+      if (!logoPath) {
+        console.error('Logo not found in any of these paths:', possiblePaths);
+        throw new Error(`Logo file not found. Searched: ${possiblePaths.join(', ')}`);
+      }
+      
       const logoData = fs.readFileSync(logoPath);
       const logoBase64 = `data:image/png;base64,${logoData.toString('base64')}`;
       doc.addImage(logoBase64, 'PNG', leftMargin - 10, topMargin, 91, 46);

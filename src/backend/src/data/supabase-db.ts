@@ -1,8 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { Service } from 'typedi';
 import { Database, Product } from './database.interface';
 
-@Service()
 export class SupabaseDatabase implements Database {
     private supabase;
 

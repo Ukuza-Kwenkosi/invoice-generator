@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../../../src/lambda/auth.ts"],
+  "sourcesContent": ["import { APIGatewayProxyHandlerV2 } from 'aws-lambda';\n\nconst json = (c: number, b: any) => ({\n  statusCode: c,\n  headers: { 'Content-Type': 'application/json' },\n  body: JSON.stringify(b),\n});\n\nexport const login: APIGatewayProxyHandlerV2 = async (event) => {\n  const { username, password } = JSON.parse(event.body || '{}');\n  if (username === process.env.ADMIN_USERNAME && password === process.env.ADMIN_PASSWORD) {\n    return json(200, { success: true, data: { token: process.env.ADMIN_PASSWORD } });\n  }\n  return json(401, { success: false, error: 'Invalid credentials' });\n};\n\nexport const logout: APIGatewayProxyHandlerV2 = async () => json(200, { success: true });\n\n\n\n"],
+  "mappings": ";;;;;;;;;;;;;;;;;;;;AAAA;AAAA;AAAA;AAAA;AAAA;AAAA;AAEA,IAAM,OAAO,CAAC,GAAW,OAAY;AAAA,EACnC,YAAY;AAAA,EACZ,SAAS,EAAE,gBAAgB,mBAAmB;AAAA,EAC9C,MAAM,KAAK,UAAU,CAAC;AACxB;AAEO,IAAM,QAAkC,OAAO,UAAU;AAC9D,QAAM,EAAE,UAAU,SAAS,IAAI,KAAK,MAAM,MAAM,QAAQ,IAAI;AAC5D,MAAI,aAAa,QAAQ,IAAI,kBAAkB,aAAa,QAAQ,IAAI,gBAAgB;AACtF,WAAO,KAAK,KAAK,EAAE,SAAS,MAAM,MAAM,EAAE,OAAO,QAAQ,IAAI,eAAe,EAAE,CAAC;AAAA,EACjF;AACA,SAAO,KAAK,KAAK,EAAE,SAAS,OAAO,OAAO,sBAAsB,CAAC;AACnE;AAEO,IAAM,SAAmC,YAAY,KAAK,KAAK,EAAE,SAAS,KAAK,CAAC;",
+  "names": []
+}

@@ -11,7 +11,7 @@ declare const __API_BASE_URL__: string;
 
 // API Configuration
 export const API_CONFIG: ApiConfig = {
-    baseUrl: isDevelopment ? 'http://localhost:3000' : 'http://13.247.89.204:3000'
+    baseUrl: isDevelopment ? 'http://localhost:3000/api' : 'https://your-api-gateway-url.execute-api.af-south-1.amazonaws.com/api'
 };
 
 // Get the appropriate API URL based on environment

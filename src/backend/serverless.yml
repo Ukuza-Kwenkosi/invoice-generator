@@ -1,6 +1,8 @@
 service: invoice-generator-api
 frameworkVersion: '3'
 
+useDotenv: true
+
 provider:
   name: aws
   runtime: nodejs18.x
@@ -9,89 +11,101 @@ provider:
     cors:
       allowedOrigins:
         - https://dctxoovo0tr3t.cloudfront.net
+        - http://localhost:3001
+        - http://localhost:8080
+        - http://127.0.0.1:3001
       allowedHeaders:
         - Content-Type
         - Authorization
         - X-API-Key
+        - X-Amz-Date
+        - X-Amz-Security-Token
       allowedMethods:
         - GET
         - POST
         - PUT
         - DELETE
         - OPTIONS
+      allowCredentials: true
   environment:
-    NODE_ENV: production
+    NODE_ENV: ${env:NODE_ENV, 'production'}
     AWS_REGION: ${aws:region}
     ADMIN_USERNAME: ${env:ADMIN_USERNAME}
     ADMIN_PASSWORD: ${env:ADMIN_PASSWORD}
     SUPABASE_API_URL: ${env:SUPABASE_API_URL}
     SUPABASE_API_KEY: ${env:SUPABASE_API_KEY}
-    CORS_ORIGIN: https://dctxoovo0tr3t.cloudfront.net
+    CORS_ORIGIN: ${env:CORS_ORIGIN, 'https://dctxoovo0tr3t.cloudfront.net'}
   # No IAM permissions needed for Supabase (external service)
 
 functions:
   health:
-    handler: dist/lambda/health.handler
+    handler: src/lambda/health.handler
     events:
       - httpApi: { path: /api/health, method: GET }
 
   login:
-    handler: dist/lambda/auth.login
+    handler: src/lambda/auth.login
     events:
       - httpApi: { path: /api/auth/login, method: POST }
 
   logout:
-    handler: dist/lambda/auth.logout
+    handler: src/lambda/auth.logout
     events:
       - httpApi: { path: /api/auth/logout, method: POST }
 
   getProducts:
-    handler: dist/lambda/products.getProducts
+    handler: src/lambda/products.getProducts
     events:
       - httpApi: { path: /api/products, method: GET }
 
   getProduct:
-    handler: dist/lambda/products.getProduct
+    handler: src/lambda/products.getProduct
     events:
       - httpApi: { path: "/api/products/{id}", method: GET }
 
   createProduct:
-    handler: dist/lambda/products.createProduct
+    handler: src/lambda/products.createProduct
     events:
       - httpApi: { path: /api/products, method: POST }
 
   updateProduct:
-    handler: dist/lambda/products.updateProduct
+    handler: src/lambda/products.updateProduct
     events:
       - httpApi: { path: "/api/products/{id}", method: PUT }
 
   deleteProduct:
-    handler: dist/lambda/products.deleteProduct
+    handler: src/lambda/products.deleteProduct
     events:
       - httpApi: { path: "/api/products/{id}", method: DELETE }
 
   generateInvoice:
-    handler: dist/lambda/invoice.generate
+    handler: src/lambda/invoice.generate
     timeout: 30
     events:
       - httpApi: { path: /api/generate-invoice, method: POST }
 
 plugins:
   - serverless-esbuild
+  - serverless-offline
 
 custom:
+  serverless-offline:
+    httpPort: 3000
+    host: 0.0.0.0
+    corsAllowOrigin: '*'
+    corsAllowHeaders: 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,X-API-Key'
+    corsAllowCredentials: true
   esbuild:
     bundle: true
-    minify: true
-    sourcemap: false
+    minify: false
+    sourcemap: true
     target: node18
     platform: node
+    packager: npm
     external:
       - '@aws-sdk/*'
-    entryPoints:
-      - src/lambda/health.ts
-      - src/lambda/auth.ts
-      - src/lambda/products.ts
-      - src/lambda/invoice.ts
+      - 'canvas'
+      - 'bufferutil'
+      - 'utf-8-validate'
 
 
