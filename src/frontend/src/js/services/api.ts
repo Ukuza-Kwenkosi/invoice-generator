@@ -10,6 +10,7 @@ interface LoginCredentials {
 interface ApiResponse {
     success: boolean;
     error?: string;
+    apiKey?: string;
     data?: {
         token?: string;
     };
@@ -60,11 +61,18 @@ class ApiService {
 
     async createProduct(product: Omit<Product, 'id'>): Promise<Product> {
         try {
+            const apiKey = localStorage.getItem('apiKey');
+            const headers: HeadersInit = {
+                'Content-Type': 'application/json',
+            };
+            
+            if (apiKey) {
+                headers['X-API-Key'] = apiKey;
+            }
+
             const response = await fetch(getApiUrl('/products'), {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers,
                 body: JSON.stringify(product),
                 credentials: 'include'
             });
@@ -80,11 +88,18 @@ class ApiService {
 
     async updateProduct(name: string, product: Omit<Product, 'id'>): Promise<Product> {
         try {
+            const apiKey = localStorage.getItem('apiKey');
+            const headers: HeadersInit = {
+                'Content-Type': 'application/json',
+            };
+            
+            if (apiKey) {
+                headers['X-API-Key'] = apiKey;
+            }
+
             const response = await fetch(getApiUrl(`/products/${encodeURIComponent(name)}`), {
                 method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers,
                 body: JSON.stringify(product),
                 credentials: 'include'
             });
@@ -94,6 +109,31 @@ class ApiService {
             return await response.json();
         } catch (error) {
             console.error('Error updating product:', error);
+            throw error;
+        }
+    }
+
+    async deleteProduct(name: string): Promise<void> {
+        try {
+            const apiKey = localStorage.getItem('apiKey');
+            const headers: HeadersInit = {
+                'Content-Type': 'application/json',
+            };
+            
+            if (apiKey) {
+                headers['X-API-Key'] = apiKey;
+            }
+
+            const response = await fetch(getApiUrl(`/products/${encodeURIComponent(name)}`), {
+                method: 'DELETE',
+                headers,
+                credentials: 'include'
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+        } catch (error) {
+            console.error('Error deleting product:', error);
             throw error;
         }
     }
@@ -110,8 +150,11 @@ class ApiService {
             });
             const data = await response.json();
             if (data.success) {
-                // Store authentication state
+                // Store authentication state and API key
                 localStorage.setItem('isAuthenticated', 'true');
+                if (data.apiKey) {
+                    localStorage.setItem('apiKey', data.apiKey);
+                }
             }
             return data;
         } catch (error) {
@@ -128,8 +171,9 @@ class ApiService {
             });
             const data = await response.json();
             if (data.success) {
-                // Clear authentication state
+                // Clear authentication state and API key
                 localStorage.removeItem('isAuthenticated');
+                localStorage.removeItem('apiKey');
             }
             return data;
         } catch (error) {

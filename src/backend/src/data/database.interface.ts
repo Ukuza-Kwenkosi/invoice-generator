@@ -14,6 +14,8 @@ export interface Product {
 
 export interface Database {
     getAllProducts(): Promise<Product[]>;
+    getProduct(name: string): Promise<Product | null>;
+    addProduct(product: Omit<Product, 'id'>): Promise<void>;
     updateProduct(name: string, product: Omit<Product, 'id'>): Promise<void>;
-    // Add other methods as needed
+    deleteProduct(name: string): Promise<void>;
 } 

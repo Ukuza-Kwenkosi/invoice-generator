@@ -50,8 +50,7 @@ class LoginComponent {
         // Store the token
         localStorage.setItem('token', response.data?.token || '');
         // Redirect to backoffice
-        const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        window.location.href = isDevelopment ? '/backoffice' : '/backoffice.html';
+        window.location.href = '/backoffice.html';
       } else {
         this.showError(response.error || 'Login failed');
       }

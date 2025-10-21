@@ -1,0 +1,97 @@
+service: invoice-generator-api
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: af-south-1
+  httpApi:
+    cors:
+      allowedOrigins:
+        - https://dctxoovo0tr3t.cloudfront.net
+      allowedHeaders:
+        - Content-Type
+        - Authorization
+        - X-API-Key
+      allowedMethods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+  environment:
+    NODE_ENV: production
+    AWS_REGION: ${aws:region}
+    ADMIN_USERNAME: ${env:ADMIN_USERNAME}
+    ADMIN_PASSWORD: ${env:ADMIN_PASSWORD}
+    SUPABASE_API_URL: ${env:SUPABASE_API_URL}
+    SUPABASE_API_KEY: ${env:SUPABASE_API_KEY}
+    CORS_ORIGIN: https://dctxoovo0tr3t.cloudfront.net
+  # No IAM permissions needed for Supabase (external service)
+
+functions:
+  health:
+    handler: dist/lambda/health.handler
+    events:
+      - httpApi: { path: /api/health, method: GET }
+
+  login:
+    handler: dist/lambda/auth.login
+    events:
+      - httpApi: { path: /api/auth/login, method: POST }
+
+  logout:
+    handler: dist/lambda/auth.logout
+    events:
+      - httpApi: { path: /api/auth/logout, method: POST }
+
+  getProducts:
+    handler: dist/lambda/products.getProducts
+    events:
+      - httpApi: { path: /api/products, method: GET }
+
+  getProduct:
+    handler: dist/lambda/products.getProduct
+    events:
+      - httpApi: { path: "/api/products/{id}", method: GET }
+
+  createProduct:
+    handler: dist/lambda/products.createProduct
+    events:
+      - httpApi: { path: /api/products, method: POST }
+
+  updateProduct:
+    handler: dist/lambda/products.updateProduct
+    events:
+      - httpApi: { path: "/api/products/{id}", method: PUT }
+
+  deleteProduct:
+    handler: dist/lambda/products.deleteProduct
+    events:
+      - httpApi: { path: "/api/products/{id}", method: DELETE }
+
+  generateInvoice:
+    handler: dist/lambda/invoice.generate
+    timeout: 30
+    events:
+      - httpApi: { path: /api/generate-invoice, method: POST }
+
+plugins:
+  - serverless-esbuild
+
+custom:
+  esbuild:
+    bundle: true
+    minify: true
+    sourcemap: false
+    target: node18
+    platform: node
+    external:
+      - '@aws-sdk/*'
+    entryPoints:
+      - src/lambda/health.ts
+      - src/lambda/auth.ts
+      - src/lambda/products.ts
+      - src/lambda/invoice.ts
+
+

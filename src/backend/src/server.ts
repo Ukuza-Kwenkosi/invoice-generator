@@ -12,8 +12,6 @@ import { formatCurrency } from './utils/formatting';
 import { logInvoiceGeneration } from './utils/logger';
 import { config } from 'dotenv';
 import { Database } from './data/database.interface';
-import { FileDatabase } from './data/file-db';
-import { DynamoDatabase } from './data/dynamodb';
 
 // Extend express-session types
 declare module 'express-session' {

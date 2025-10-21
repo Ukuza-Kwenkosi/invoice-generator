@@ -21,7 +21,7 @@ export class AuthService {
         try {
             const response = await apiService.login({ username, password });
             if (response.success) {
-                window.location.href = '/dashboard';
+                window.location.href = '/backoffice.html';
             } else {
                 this.showError(response.error || 'Login failed');
             }
